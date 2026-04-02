@@ -264,15 +264,19 @@
     const bg = b.background?.value || 'linear-gradient(135deg,#2a4299,#4f7cff)';
     const vis = { workspace: '🌐', private: '🔒', public: '🌍' }[b.visibility] || '';
     return `
-      <a class="board-card" href="/pages/kanban.html?board=${b.id}&ws=${currentWorkspaceId}" title="Abrir board">
         <div class="board-cover" style="background:${bg}"></div>
         <div class="board-info">
           <div class="board-name">${b.name}</div>
           <div class="board-meta">
             <span class="text-sm text-muted">${vis} ${b.visibility}</span>
+            <span class="btn btn-ghost btn-sm" style="margin-left:auto">Abrir</span>
           </div>
         </div>
-      </a>`;
+      </button>`;
+  }
+
+  function openBoard(boardId) {
+    window.location.href = `/pages/kanban.html?board=${boardId}&ws=${currentWorkspaceId}`;
   }
 
   function renderNoWorkspace() {
