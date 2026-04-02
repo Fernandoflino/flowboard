@@ -8,9 +8,15 @@
   <style>
     .boards-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      grid-template-columns: repeat(1, minmax(0, 1fr));
       gap: 16px;
       margin-top: 24px;
+    }
+    @media (min-width: 768px) {
+      .boards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (min-width: 1200px) {
+      .boards-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
     .board-card {
       background: var(--bg2); border: 1px solid var(--border);
@@ -26,7 +32,8 @@
     }
     .board-info { padding: 14px 16px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
     .board-name { font-family: var(--font-display); font-weight: 700; font-size: .95rem; }
-    .board-meta { display: flex; align-items: center; gap: 8px; margin-top: auto; }
+    .board-meta { display: flex; align-items: center; gap: 8px; margin-top: auto; justify-content: space-between; flex-wrap: wrap; }
+    .board-open-btn { margin-left: auto; }
     .board-add {
       border: 2px dashed var(--border2); background: transparent;
       display: flex; flex-direction: column; align-items: center;
@@ -38,7 +45,7 @@
     .board-add .icon { font-size: 1.6rem; }
 
     /* STATS */
-    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 8px; }
+    .stats-row { display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 14px; margin-bottom: 8px; }
     .stat-card {
       background: var(--bg2); border: 1px solid var(--border);
       border-radius: var(--radius-lg); padding: 18px 20px;
@@ -53,7 +60,8 @@
       padding: 16px 12px; overflow-y: auto;
     }
 
-    @media (max-width: 768px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 700px) { .stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (min-width: 1200px) { .stats-row { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
   </style>
 </head>
 <body>
@@ -270,32 +278,15 @@
           <div class="board-name">${b.name}</div>
           <div class="board-meta">
             <span class="text-sm text-muted">${vis} ${b.visibility}</span>
-            <button type="button" class="btn btn-ghost btn-sm" onclick="openBoard(event, '${b.id}')">Abrir</button>
-            <span class="btn btn-ghost btn-sm" style="margin-left:auto">Abrir</span>
+            <button type="button" class="btn btn-ghost btn-sm board-open-btn" onclick="openBoard(event, '${b.id}')">Abrir</button>
           </div>
         </div>
-      </button>`;
-  }
-
-  function openBoard(boardId) {
-    window.location.href = `/pages/kanban.html?board=${boardId}&ws=${currentWorkspaceId}`;
+      </a>`;
   }
 
   function openBoard(event, boardId) {
-    if (event) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-    window.location.href = `/pages/kanban.html?board=${boardId}&ws=${currentWorkspaceId}`;
-  }
-
-  function openBoard(eventOrBoardId, maybeBoardId) {
-    const boardId = maybeBoardId || eventOrBoardId;
-    const evt = (eventOrBoardId && typeof eventOrBoardId === 'object') ? eventOrBoardId : null;
-
-    if (evt?.preventDefault) evt.preventDefault();
-    if (evt?.stopPropagation) evt.stopPropagation();
-
+    if (event?.preventDefault) event.preventDefault();
+    if (event?.stopPropagation) event.stopPropagation();
     window.location.href = `/pages/kanban.html?board=${boardId}&ws=${currentWorkspaceId}`;
   }
 
