@@ -180,7 +180,7 @@ async function loadAll() {
     db.from('lists').select('*').eq('board_id', BOARD_ID).eq('is_archived', false).order('position'),
     db.from('cards').select(`
       id, title, status, position, due_date, cover_color, list_id, is_archived,
-      card_members(user_id, profiles(full_name, avatar_url)),
+      card_members(user_id, profiles!card_members_user_id_fkey(full_name, avatar_url)),
       card_labels(label_id, labels(name, color))
     `).in('list_id', (await db.from('lists').select('id').eq('board_id', BOARD_ID)).data?.map(l=>l.id) || [])
       .eq('is_archived', false).order('position'),
@@ -393,7 +393,7 @@ async function saveCard(listId) {
     list_id: listId, title, position: pos, created_by: App.user.id
   }).select(`
     id, title, status, position, due_date, cover_color, list_id, is_archived,
-    card_members(user_id, profiles(full_name, avatar_url)),
+    card_members(user_id, profiles!card_members_user_id_fkey(full_name, avatar_url)),
     card_labels(label_id, labels(name, color))
   `).single();
 
