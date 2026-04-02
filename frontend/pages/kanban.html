@@ -150,8 +150,10 @@ function normalizeParam(value) {
 
 const BOARD_ID = normalizeParam(params.get('board_id'))
   || normalizeParam(params.get('board'))
+  || normalizeParam(params.get('boardId'))
   || normalizeParam(sessionStorage.getItem('lastBoardId'));
 const WS_ID = normalizeParam(params.get('workspace_id'))
+  || normalizeParam(params.get('workspaceId'))
   || normalizeParam(params.get('ws'))
   || normalizeParam(localStorage.getItem('activeWorkspace'));
 
@@ -469,8 +471,11 @@ function openCard(cardId) {
 
   const cardParams = new URLSearchParams({
     card_id: safeCardId,
+    cardId: safeCardId,
     board_id: BOARD_ID,
+    boardId: BOARD_ID,
     workspace_id: WS_ID,
+    workspaceId: WS_ID,
   });
   window.location.href = `/pages/card.html?${cardParams.toString()}`;
 }

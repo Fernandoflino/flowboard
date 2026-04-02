@@ -94,11 +94,23 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/supabase.js"></script>
 <script>
-const params   = new URLSearchParams(location.search);
+const searchParams = new URLSearchParams(window.location.search);
+const hashQuery = window.location.hash.includes('?')
+  ? window.location.hash.slice(window.location.hash.indexOf('?') + 1)
+  : '';
+const hashParams = new URLSearchParams(hashQuery);
 
 function normalizeParam(value) {
   if (!value || value === 'null' || value === 'undefined') return null;
   return value;
+}
+
+function firstParam(...keys) {
+  for (const key of keys) {
+    const value = normalizeParam(searchParams.get(key)) || normalizeParam(hashParams.get(key));
+    if (value) return value;
+  }
+  return null;
 }
 
 function getCardIdFromPath() {
@@ -109,13 +121,11 @@ function getCardIdFromPath() {
   return normalizeParam(decodeURIComponent(cardCandidate));
 }
 
-const CARD_ID  = normalizeParam(params.get('card'))
-  || normalizeParam(params.get('card_id'))
-  || getCardIdFromPath();
-const BOARD_ID = normalizeParam(params.get('board'))
-  || normalizeParam(params.get('board_id'));
-const WS_ID    = normalizeParam(params.get('ws'))
-  || normalizeParam(params.get('workspace_id'));
+const CARD_ID  = firstParam('card', 'card_id', 'cardId', 'id') || getCardIdFromPath();
+const BOARD_ID = firstParam('board', 'board_id', 'boardId')
+  || normalizeParam(sessionStorage.getItem('lastBoardId'));
+const WS_ID    = firstParam('ws', 'workspace_id', 'workspaceId', 'workspace', 'ws_id')
+  || normalizeParam(localStorage.getItem('activeWorkspace'));
 
 let card = null, checklists = [], comments = [], attachments = [], allMembers = [], allLabels = [];
 const COVER_COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#8b5cf6','#6b7280'];

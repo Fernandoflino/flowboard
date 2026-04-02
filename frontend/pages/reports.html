@@ -275,7 +275,7 @@ function render() {
                   return `
                   <tr>
                     <td>
-                      <a href="/pages/card.html?card_id=${c.card_id}&board_id=${c.board_id}&workspace_id=${c.workspace_id}"
+                      <a href="/pages/card.html?card_id=${c.card_id}&cardId=${c.card_id}&board_id=${c.board_id}&boardId=${c.board_id}&workspace_id=${c.workspace_id}&workspaceId=${c.workspace_id}"
                          style="color:var(--accent);font-weight:500">${c.card_title}</a>
                       ${c.is_overdue ? '<span class="badge badge-red" style="margin-left:5px;font-size:.65rem">Atrasado</span>' : ''}
                     </td>
