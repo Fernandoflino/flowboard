@@ -323,9 +323,11 @@
     const name = document.getElementById('ws-name').value.trim();
     const desc = document.getElementById('ws-desc').value.trim();
     if (!name) { toast('Digite um nome', 'error'); return; }
+    const { data: { user } } = await db.auth.getUser();
+    if (!user?.id) { toast('Sessão expirada. Faça login novamente.', 'error'); return; }
 
     const { data, error } = await db.from('workspaces').insert({
-      name, description: desc || null, owner_id: App.user.id
+      name, description: desc || null, owner_id: user.id
     }).select().single();
 
     if (error) { toast(error.message, 'error'); return; }
@@ -338,11 +340,13 @@
     const name = document.getElementById('board-name').value.trim();
     const vis  = document.getElementById('board-visibility').value;
     if (!name) { toast('Digite um nome para o board', 'error'); return; }
+    const { data: { user } } = await db.auth.getUser();
+    if (!user?.id) { toast('Sessão expirada. Faça login novamente.', 'error'); return; }
 
     const { data, error } = await db.from('boards').insert({
       name, visibility: vis,
       workspace_id: currentWorkspaceId,
-      created_by: App.user.id,
+      created_by: user.id,
       background: { type: 'gradient', value: selectedColor }
     }).select().single();
 

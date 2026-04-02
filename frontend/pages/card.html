@@ -6,7 +6,8 @@
   <title>FlowBoard — Cartão</title>
   <link rel="stylesheet" href="../css/style.css">
   <style>
-    .card-page { display: grid; grid-template-columns: 1fr 300px; gap: 0; flex: 1; overflow: hidden; }
+    .app-shell { grid-template-columns: 1fr; }
+    .card-page { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 0; flex: 1; overflow: hidden; width: 100%; }
     .card-main  { padding: 28px; overflow-y: auto; }
     .card-aside { background: var(--bg2); border-left: 1px solid var(--border); padding: 20px; overflow-y: auto; }
 
@@ -59,6 +60,15 @@
     .label-item { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
     .label-dot { width: 24px; height: 24px; border-radius: 4px; flex-shrink: 0; }
     .label-name { font-size: .85rem; }
+    .cover-palette { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 8px; margin-bottom: 10px; }
+    .cover-color-btn {
+      width: 100%; aspect-ratio: 1/1; border-radius: 999px; border: 2px solid transparent;
+      cursor: pointer; transition: transform .15s ease, border-color .15s ease;
+    }
+    .cover-color-btn:hover { transform: scale(1.06); }
+    .cover-color-btn.active { border-color: #fff; box-shadow: 0 0 0 2px var(--accent-glow); }
+    .cover-controls { display: flex; align-items: center; gap: 8px; }
+    .cover-clear-btn { margin-left: auto; }
 
     /* Anexos */
     .attach-item { display: flex; align-items: center; gap: 10px; padding: 8px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; }
@@ -66,7 +76,7 @@
     .attach-name { font-size: .85rem; font-weight: 500; truncate: true; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .attach-img { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; }
 
-    @media (max-width: 900px) {
+    @media (max-width: 1024px) {
       .card-page { grid-template-columns: 1fr; }
       .card-aside { border-left: none; border-top: 1px solid var(--border); }
     }
@@ -90,6 +100,17 @@ const BOARD_ID = params.get('board');
 const WS_ID    = params.get('ws');
 
 let card = null, checklists = [], comments = [], attachments = [], allMembers = [], allLabels = [];
+const COVER_COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#8b5cf6','#6b7280'];
+
+async function getCurrentUserId() {
+  if (App.user?.id) return App.user.id;
+  const { data: { user } } = await db.auth.getUser();
+  if (user?.id) {
+    App.user = user;
+    return user.id;
+  }
+  throw new Error('Usuário não autenticado');
+}
 
 async function init() {
   await initTopbar(WS_ID);
@@ -272,8 +293,20 @@ function render() {
               📎 Anexar arquivo
               <input type="file" style="display:none" onchange="uploadAttachment(this)">
             </label>
-            <button class="btn btn-ghost btn-sm" style="justify-content:flex-start;gap:8px"
-              onclick="pickCover()">🎨 Cor de capa</button>
+            <div>
+              <div class="text-sm text-muted" style="margin:8px 0 6px">🎨 Cor de capa</div>
+              <div class="cover-palette">
+                ${COVER_COLORS.map(color => `
+                  <button class="cover-color-btn ${card?.cover_color === color ? 'active' : ''}"
+                    style="background:${color}" onclick="setCoverColor('${color}')" title="${color}"></button>
+                `).join('')}
+              </div>
+              <div class="cover-controls">
+                <input type="color" class="input" style="padding:4px;height:36px;max-width:88px"
+                  value="${card?.cover_color || '#3b82f6'}" onchange="setCoverColor(this.value)">
+                <button class="btn btn-ghost btn-sm cover-clear-btn" onclick="setCoverColor(null)">Remover</button>
+              </div>
+            </div>
             <button class="btn btn-danger btn-sm" style="justify-content:flex-start;gap:8px;margin-top:8px"
               onclick="archiveCard()">🗄 Arquivar cartão</button>
           </div>
@@ -321,7 +354,8 @@ async function updateDates() {
 
 // ── MEMBROS ──────────────────────────────────────────────────
 async function addMember(userId) {
-  const { error } = await db.from('card_members').insert({ card_id: CARD_ID, user_id: userId, added_by: App.user.id });
+  const currentUserId = await getCurrentUserId();
+  const { error } = await db.from('card_members').insert({ card_id: CARD_ID, user_id: userId, added_by: currentUserId });
   if (error) { toast(error.message,'error'); return; }
   await loadAll(); render();
 }
@@ -432,8 +466,9 @@ function renderComment(c) {
 async function postComment() {
   const content = document.getElementById('new-comment').value.trim();
   if (!content) return;
+  const currentUserId = await getCurrentUserId();
   const { data, error } = await db.from('card_comments')
-    .insert({ card_id: CARD_ID, user_id: App.user.id, content })
+    .insert({ card_id: CARD_ID, user_id: currentUserId, content })
     .select('*, profiles(full_name, avatar_url)').single();
   if (error) { toast(error.message,'error'); return; }
   comments.push(data);
@@ -482,12 +517,13 @@ function renderAttachment(a) {
 async function uploadAttachment(input) {
   const file = input.files[0];
   if (!file) return;
+  const currentUserId = await getCurrentUserId();
   const path = `${WS_ID}/${CARD_ID}/${Date.now()}-${file.name}`;
-  const { data: storageData, error: storageError } = await db.storage.from('attachments').upload(path, file);
+  const { error: storageError } = await db.storage.from('attachments').upload(path, file);
   if (storageError) { toast('Erro no upload: ' + storageError.message, 'error'); return; }
   const { data: urlData } = db.storage.from('attachments').getPublicUrl(path);
   const { error } = await db.from('card_attachments').insert({
-    card_id: CARD_ID, uploaded_by: App.user.id,
+    card_id: CARD_ID, uploaded_by: currentUserId,
     name: file.name, url: urlData.publicUrl,
     storage_path: path, mime_type: file.type,
     size_bytes: file.size,
@@ -504,8 +540,7 @@ async function archiveCard() {
   setTimeout(() => window.location.href = `/pages/kanban.html?board=${BOARD_ID}&ws=${WS_ID}`, 1000);
 }
 
-async function pickCover() {
-  const color = prompt('Digite uma cor hex (ex: #ef4444) ou deixe vazio para remover:');
+async function setCoverColor(color) {
   await db.from('cards').update({ cover_color: color || null }).eq('id', CARD_ID);
   card.cover_color = color || null;
   render();

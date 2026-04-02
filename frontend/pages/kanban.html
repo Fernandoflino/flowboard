@@ -388,12 +388,14 @@ function hideAddCard(listId) {
 async function saveCard(listId) {
   const title = document.getElementById(`new-card-${listId}`).value.trim();
   if (!title) return;
+  const { data: { user } } = await db.auth.getUser();
+  if (!user?.id) { toast('Sessão expirada. Faça login novamente.', 'error'); return; }
 
   const listCards = filteredCards(listId);
   const pos = listCards.length > 0 ? listCards[listCards.length-1].position + 1 : 1;
 
   const { data, error } = await db.from('cards').insert({
-    list_id: listId, title, position: pos, created_by: App.user.id
+    list_id: listId, title, position: pos, created_by: user.id
   }).select(`
     id, title, status, position, due_date, cover_color, list_id, is_archived,
     card_members(user_id, profiles!card_members_user_id_fkey(full_name, avatar_url)),
