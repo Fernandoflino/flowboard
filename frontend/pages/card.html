@@ -95,13 +95,27 @@
 <script src="../js/supabase.js"></script>
 <script>
 const params   = new URLSearchParams(location.search);
+
 function normalizeParam(value) {
   if (!value || value === 'null' || value === 'undefined') return null;
   return value;
 }
-const CARD_ID  = normalizeParam(params.get('card'));
-const BOARD_ID = normalizeParam(params.get('board'));
-const WS_ID    = normalizeParam(params.get('ws'));
+
+function getCardIdFromPath() {
+  const parts = window.location.pathname.split('/').filter(Boolean);
+  const cardCandidate = parts[parts.length - 1];
+  if (!cardCandidate) return null;
+  if (cardCandidate === 'card' || cardCandidate === 'card.html') return null;
+  return normalizeParam(decodeURIComponent(cardCandidate));
+}
+
+const CARD_ID  = normalizeParam(params.get('card'))
+  || normalizeParam(params.get('card_id'))
+  || getCardIdFromPath();
+const BOARD_ID = normalizeParam(params.get('board'))
+  || normalizeParam(params.get('board_id'));
+const WS_ID    = normalizeParam(params.get('ws'))
+  || normalizeParam(params.get('workspace_id'));
 
 let card = null, checklists = [], comments = [], attachments = [], allMembers = [], allLabels = [];
 const COVER_COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#8b5cf6','#6b7280'];
@@ -139,7 +153,7 @@ async function init() {
       <div class="empty-state">
         <div class="icon">⚠️</div>
         <h2>Parâmetros inválidos</h2>
-        <p>Abra o cartão novamente pelo board para carregar os IDs obrigatórios.</p>
+        <p>Abra o cartão novamente pelo board para carregar os IDs obrigatórios (card_id, board_id e workspace_id).</p>
         <a class="btn btn-primary mt-4" href="/pages/dashboard.html">Voltar ao dashboard</a>
       </div>`;
     return;
