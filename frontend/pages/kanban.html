@@ -142,8 +142,18 @@
 <script src="../js/supabase.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
-const BOARD_ID = params.get('board') || sessionStorage.getItem('lastBoardId');
-const WS_ID    = params.get('ws') || localStorage.getItem('activeWorkspace');
+
+function normalizeParam(value) {
+  if (!value || value === 'null' || value === 'undefined') return null;
+  return value;
+}
+
+const BOARD_ID = normalizeParam(params.get('board_id'))
+  || normalizeParam(params.get('board'))
+  || normalizeParam(sessionStorage.getItem('lastBoardId'));
+const WS_ID = normalizeParam(params.get('workspace_id'))
+  || normalizeParam(params.get('ws'))
+  || normalizeParam(localStorage.getItem('activeWorkspace'));
 
 let board = null, lists = [], cards = [], members = [], labels = [];
 let dragCard = null, dragSourceListId = null;
@@ -451,7 +461,18 @@ async function archiveList(listId) {
 
 // ── ABRIR CARTÃO ─────────────────────────────────────────────
 function openCard(cardId) {
-  window.location.href = `/pages/card.html?card_id=${cardId}&board_id=${BOARD_ID}&workspace_id=${WS_ID}`;
+  const safeCardId = normalizeParam(cardId);
+  if (!safeCardId || !BOARD_ID || !WS_ID) {
+    toast('Não foi possível abrir o cartão: contexto incompleto do board/workspace.', 'error');
+    return;
+  }
+
+  const cardParams = new URLSearchParams({
+    card_id: safeCardId,
+    board_id: BOARD_ID,
+    workspace_id: WS_ID,
+  });
+  window.location.href = `/pages/card.html?${cardParams.toString()}`;
 }
 
 // ── FILTROS ──────────────────────────────────────────────────
