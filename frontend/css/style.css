@@ -207,7 +207,13 @@ h4 { font-size: 0.95rem; }
 }
 
 /* ── MAIN CONTENT ───────────────────────────────────────────── */
-.main-content { overflow-y: auto; padding: 28px; }
+.main-content {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 28px;
+  width: 100%;
+  min-width: 0;
+}
 
 /* ── MODAL ──────────────────────────────────────────────────── */
 .modal-overlay {
