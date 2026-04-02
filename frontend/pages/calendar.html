@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FlowBoard • Calendário</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase.js"></script>
+  <style>
+    .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:10px; }
+    .cal-day { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); min-height:120px; padding:8px; }
+    .cal-day h4 { font-size:.75rem; opacity:.8; margin-bottom:6px; }
+    .event { padding:6px; border-radius:8px; margin-bottom:6px; font-size:.8rem; background:#1e293b; border:1px solid #334155; cursor:pointer; }
+    .event.overdue { border-color:#ef4444; }
+    .legend { display:flex; gap:12px; font-size:.8rem; opacity:.85; }
+  </style>
+</head>
+<body>
+  <header class="topbar" id="topbar"></header>
+  <main class="container" style="padding:20px 28px 32px;display:flex;flex-direction:column;gap:14px;">
+    <div class="flex-between">
+      <div>
+        <h1 style="font-size:1.3rem">🗓️ Calendário</h1>
+        <p class="text-muted text-sm">Visualização mensal de cartões por data de entrega.</p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-ghost btn-sm" onclick="changeMonth(-1)">◀</button>
+        <strong id="month-label"></strong>
+        <button class="btn btn-ghost btn-sm" onclick="changeMonth(1)">▶</button>
+      </div>
+    </div>
+    <div class="legend">
+      <span>🔵 Ativo</span><span>🟢 Concluído</span><span>🔴 Atrasado</span>
+      <a id="back-link" class="btn btn-ghost btn-sm" href="#">← Voltar ao dashboard</a>
+    </div>
+    <div class="cal-grid" id="grid"></div>
+  </main>
+
+<script>
+let WS_ID = null;
+let current = new Date();
+let cards = [];
+
+async function init(){
+  const qs = new URLSearchParams(location.search);
+  WS_ID = qs.get('ws') || localStorage.getItem('activeWorkspace');
+  await initTopbar(WS_ID);
+  WS_ID = App.workspace?.id || WS_ID;
+  document.getElementById('back-link').href = `/pages/dashboard.html?ws=${WS_ID}`;
+  if(!WS_ID){ toast('Workspace não encontrado','error'); return; }
+
+  const { data, error } = await db.from('v_cards_full')
+    .select('card_id,card_title,board_name,due_date,card_status,is_overdue')
+    .eq('workspace_id', WS_ID)
+    .eq('is_archived', false)
+    .not('due_date','is',null);
+
+  if(error){ toast(error.message,'error'); return; }
+  cards = data || [];
+  render();
+}
+
+function changeMonth(delta){
+  current.setMonth(current.getMonth()+delta);
+  render();
+}
+
+function statusClass(c){
+  if(c.is_overdue) return 'overdue';
+  return '';
+}
+
+function eventEmoji(c){
+  if(c.is_overdue) return '🔴';
+  if(c.card_status==='completed') return '🟢';
+  return '🔵';
+}
+
+function render(){
+  const year = current.getFullYear();
+  const month = current.getMonth();
+  const first = new Date(year, month, 1);
+  const last = new Date(year, month+1, 0);
+  const startIdx = (first.getDay()+6)%7;
+
+  document.getElementById('month-label').textContent = first.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+
+  const totalCells = Math.ceil((startIdx+last.getDate())/7)*7;
+  for(let i=0;i<totalCells;i++){
+    const dayNum = i-startIdx+1;
+    const day = document.createElement('div');
+    day.className = 'cal-day';
+
+    if(dayNum < 1 || dayNum > last.getDate()){
+      day.style.opacity = '.35';
+      grid.appendChild(day);
+      continue;
+    }
+
+    const date = new Date(year, month, dayNum);
+    const key = date.toISOString().slice(0,10);
+
+    day.innerHTML = `<h4>${String(dayNum).padStart(2,'0')}</h4>`;
+    cards
+      .filter(c => (c.due_date||'').slice(0,10) === key)
+      .slice(0,5)
+      .forEach(c => {
+        const el = document.createElement('div');
+        el.className = `event ${statusClass(c)}`;
+        el.innerHTML = `${eventEmoji(c)} ${c.card_title}`;
+        el.title = `${c.board_name} • ${fmtDateTime(c.due_date)}`;
+        el.onclick = () => window.location.href = `/pages/reports.html?ws=${WS_ID}`;
+        day.appendChild(el);
+      });
+
+    grid.appendChild(day);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
