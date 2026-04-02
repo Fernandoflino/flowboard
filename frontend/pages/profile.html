@@ -6,7 +6,8 @@
   <title>FlowBoard — Meu Perfil</title>
   <link rel="stylesheet" href="../css/style.css">
   <style>
-    .profile-layout { display: grid; grid-template-columns: 280px 1fr; gap: 24px; max-width: 900px; margin: 0 auto; }
+    .profile-wrap { width: 100%; }
+    .profile-layout { display: grid; grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); gap: 24px; width: 100%; }
     .profile-card { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
     .avatar-upload { position: relative; cursor: pointer; }
     .avatar-upload .avatar { width: 80px; height: 80px; font-size: 1.8rem; }
@@ -17,14 +18,21 @@
     }
     .avatar-upload:hover .avatar-upload-overlay { opacity: 1; }
     .role-badge { padding: 3px 12px; border-radius: 99px; font-size: .75rem; font-weight: 700; }
+    .profile-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .stat-mini { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; min-height: 88px; }
+    .stat-mini-value { font-family: var(--font-display); font-size: 1.4rem; font-weight: 800; line-height: 1; }
+    .activity-list { display: flex; flex-direction: column; gap: 10px; }
+    .activity-item { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; }
+    .profile-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
     @media (max-width: 980px) {
-      .profile-layout { grid-template-columns: 1fr; max-width: 100%; }
+      .profile-layout { grid-template-columns: 1fr; }
     }
     @media (max-width: 640px) {
       .profile-card { align-items: flex-start; text-align: left; }
       .panel { padding: 16px; }
       .text-sm { word-break: break-word; }
+      .profile-stats { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -45,18 +53,28 @@ async function init() {
   if (!session) return;
   const ws = localStorage.getItem('activeWorkspace');
   await initTopbar(ws);
-  render();
+  await render();
 }
 
-function render() {
+async function render() {
   const p = App.profile;
   const roleColors = { MASTER: 'badge-yellow', ADMIN: 'badge-blue', MEMBER: 'badge-green', VIEWER: 'badge-gray' };
+  const ws = localStorage.getItem('activeWorkspace');
+  const [{ data: boards }, { data: cards }, { data: recentCards }] = await Promise.all([
+    db.from('boards').select('id').eq('created_by', App.user.id).eq('is_archived', false),
+    db.from('cards').select('id').eq('created_by', App.user.id).eq('is_archived', false),
+    db.from('v_cards_full')
+      .select('card_id, card_title, board_name, due_date')
+      .eq('workspace_id', ws)
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .limit(5)
+  ]);
+
   document.getElementById('main').innerHTML = `
-    <div style="max-width:900px;margin:0 auto">
+    <div class="profile-wrap">
       <h1 style="margin-bottom:24px;font-size:1.3rem">👤 Meu Perfil</h1>
       <div class="profile-layout">
-        <!-- Lado esquerdo -->
-        <div class="panel" style="text-align:center">
+        <aside class="panel" style="text-align:center">
           <label class="avatar-upload" title="Clique para trocar foto">
             ${p?.avatar_url
               ? `<div class="avatar" style="width:80px;height:80px"><img src="${p.avatar_url}"></div>`
@@ -69,10 +87,23 @@ function render() {
           <span class="badge ${roleColors[p?.global_role] || 'badge-gray'}" style="margin-top:8px">${p?.global_role}</span>
           <div class="divider" style="margin:16px 0"></div>
           <p class="text-sm text-muted">Conta criada em ${fmtDate(p?.created_at)}</p>
-        </div>
+        </aside>
 
-        <!-- Lado direito -->
-        <div style="display:flex;flex-direction:column;gap:16px">
+        <section style="display:flex;flex-direction:column;gap:16px">
+          <div class="panel">
+            <h3 style="margin-bottom:16px">Resumo</h3>
+            <div class="profile-stats">
+              <div class="stat-mini">
+                <div class="stat-mini-value">${boards?.length || 0}</div>
+                <div class="text-sm text-muted">Boards criados</div>
+              </div>
+              <div class="stat-mini">
+                <div class="stat-mini-value">${cards?.length || 0}</div>
+                <div class="text-sm text-muted">Cards criados</div>
+              </div>
+            </div>
+          </div>
+
           <div class="panel">
             <h3 style="margin-bottom:16px">Informações pessoais</h3>
             <div style="display:flex;flex-direction:column;gap:14px">
@@ -90,6 +121,20 @@ function render() {
           </div>
 
           <div class="panel">
+            <h3 style="margin-bottom:16px">Atividade recente no workspace</h3>
+            <div class="activity-list">
+              ${(recentCards?.length
+                ? recentCards.map(item => `
+                  <div class="activity-item">
+                    <div style="font-weight:600">${item.card_title}</div>
+                    <div class="text-sm text-muted">${item.board_name || 'Board sem nome'} · prazo ${item.due_date ? fmtDate(item.due_date) : 'não definido'}</div>
+                  </div>
+                `).join('')
+                : '<p class="text-sm text-muted">Sem atividade recente para mostrar.</p>')}
+            </div>
+          </div>
+
+          <div class="panel">
             <h3 style="margin-bottom:16px">Alterar senha</h3>
             <div style="display:flex;flex-direction:column;gap:14px">
               <div class="input-group">
@@ -103,7 +148,12 @@ function render() {
               <button class="btn btn-ghost" onclick="changePassword()">Alterar senha</button>
             </div>
           </div>
-        </div>
+
+          <div class="profile-actions">
+            <button class="btn btn-primary" onclick="saveProfile()">✏️ Editar perfil</button>
+            <button class="btn btn-danger" onclick="logout()">⎋ Logout</button>
+          </div>
+        </section>
       </div>
     </div>
   `;
@@ -116,7 +166,7 @@ async function saveProfile() {
   if (error) { toast(error.message, 'error'); return; }
   App.profile.full_name = name;
   toast('Perfil atualizado!', 'success');
-  render();
+  await render();
 }
 
 async function changePassword() {
@@ -140,7 +190,7 @@ async function uploadAvatar(input) {
   await db.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', App.user.id);
   App.profile.avatar_url = data.publicUrl;
   toast('Foto atualizada!', 'success');
-  render();
+  await render();
 }
 
 init();

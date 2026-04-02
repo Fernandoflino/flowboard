@@ -6,17 +6,29 @@
   <title>FlowBoard — Dashboard</title>
   <link rel="stylesheet" href="../css/style.css">
   <style>
+    .dashboard-main {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .dashboard-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
     .boards-grid {
       display: grid;
       grid-template-columns: repeat(1, minmax(0, 1fr));
-      gap: 16px;
-      margin-top: 24px;
+      gap: 18px;
     }
     @media (min-width: 768px) {
       .boards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (min-width: 1200px) {
-      .boards-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .boards-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     }
     .board-card {
       background: var(--bg2); border: 1px solid var(--border);
@@ -24,6 +36,7 @@
       cursor: pointer; transition: all .2s;
       text-decoration: none; color: inherit;
       display: flex; flex-direction: column;
+      min-height: 176px;
     }
     .board-card:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 8px 32px rgba(79,124,255,.15); }
     .board-cover {
@@ -45,7 +58,7 @@
     .board-add .icon { font-size: 1.6rem; }
 
     /* STATS */
-    .stats-row { display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 14px; margin-bottom: 8px; }
+    .stats-row { display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 14px; }
     .stat-card {
       background: var(--bg2); border: 1px solid var(--border);
       border-radius: var(--radius-lg); padding: 18px 20px;
@@ -228,7 +241,8 @@
     const filtered = search ? boards?.filter(b => b.name.toLowerCase().includes(search)) : boards;
 
     main.innerHTML = `
-      <div class="flex-between">
+      <section class="dashboard-main">
+      <div class="dashboard-header">
         <div>
           <h1 style="font-size:1.4rem">🏢 ${App.workspace?.name}</h1>
           <p class="text-muted text-sm mt-2">Seus boards de trabalho</p>
@@ -236,7 +250,7 @@
         <button class="btn btn-primary" onclick="openModal('modal-new-board')">＋ Novo board</button>
       </div>
 
-      <div class="stats-row" style="margin-top:24px">
+      <div class="stats-row">
         <div class="stat-card">
           <div class="stat-value">${total}</div>
           <div class="stat-label">Total de cartões</div>
@@ -265,6 +279,7 @@
           <span>Criar novo board</span>
         </div>
       </div>
+      </section>
     `;
   }
 
