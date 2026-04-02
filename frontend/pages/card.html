@@ -113,6 +113,7 @@ async function getCurrentUserId() {
     App.user = user;
     return user.id;
   }
+<<<<<<< codex/fix-kanban-layout-issues-bw46s7
   toast('Usuário não autenticado. Faça login novamente.', 'error');
   window.location.href = '/login.html';
   return null;
@@ -121,6 +122,9 @@ async function getCurrentUserId() {
 function requireContextId(id, label) {
   if (!id) throw new Error(`${label} não informado(a) na URL.`);
   return id;
+=======
+  throw new Error('Usuário não autenticado');
+>>>>>>> main
 }
 
 async function init() {
@@ -381,8 +385,12 @@ async function updateDates() {
 // ── MEMBROS ──────────────────────────────────────────────────
 async function addMember(userId) {
   const currentUserId = await getCurrentUserId();
+<<<<<<< codex/fix-kanban-layout-issues-bw46s7
   if (!currentUserId) return;
   const { error } = await db.from('card_members').insert({ card_id: requireContextId(CARD_ID, 'Card'), user_id: userId, added_by: currentUserId });
+=======
+  const { error } = await db.from('card_members').insert({ card_id: CARD_ID, user_id: userId, added_by: currentUserId });
+>>>>>>> main
   if (error) { toast(error.message,'error'); return; }
   await loadAll(); render();
 }
@@ -494,9 +502,14 @@ async function postComment() {
   const content = document.getElementById('new-comment').value.trim();
   if (!content) return;
   const currentUserId = await getCurrentUserId();
+<<<<<<< codex/fix-kanban-layout-issues-bw46s7
   if (!currentUserId) return;
   const { data, error } = await db.from('card_comments')
     .insert({ card_id: requireContextId(CARD_ID, 'Card'), user_id: currentUserId, content })
+=======
+  const { data, error } = await db.from('card_comments')
+    .insert({ card_id: CARD_ID, user_id: currentUserId, content })
+>>>>>>> main
     .select('*, profiles(full_name, avatar_url)').single();
   if (error) { toast(error.message,'error'); return; }
   comments.push(data);
@@ -546,15 +559,23 @@ async function uploadAttachment(input) {
   const file = input.files[0];
   if (!file) return;
   const currentUserId = await getCurrentUserId();
+<<<<<<< codex/fix-kanban-layout-issues-bw46s7
   if (!currentUserId) return;
   const safeWorkspaceId = requireContextId(WS_ID, 'Workspace');
   const safeCardId = requireContextId(CARD_ID, 'Card');
   const path = `${safeWorkspaceId}/${safeCardId}/${Date.now()}-${file.name}`;
+=======
+  const path = `${WS_ID}/${CARD_ID}/${Date.now()}-${file.name}`;
+>>>>>>> main
   const { error: storageError } = await db.storage.from('attachments').upload(path, file);
   if (storageError) { toast('Erro no upload: ' + storageError.message, 'error'); return; }
   const { data: urlData } = db.storage.from('attachments').getPublicUrl(path);
   const { error } = await db.from('card_attachments').insert({
+<<<<<<< codex/fix-kanban-layout-issues-bw46s7
     card_id: safeCardId, uploaded_by: currentUserId,
+=======
+    card_id: CARD_ID, uploaded_by: currentUserId,
+>>>>>>> main
     name: file.name, url: urlData.publicUrl,
     storage_path: path, mime_type: file.type,
     size_bytes: file.size,
