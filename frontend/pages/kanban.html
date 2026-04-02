@@ -7,8 +7,8 @@
   <link rel="stylesheet" href="../css/style.css">
   <style>
     body { overflow: hidden; }
-    .app-shell { height: 100vh; overflow: hidden; }
-    .main-content { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+    .app-shell { height: 100vh; overflow: hidden; grid-template-columns: 1fr; }
+    .main-content { padding: 0; overflow: hidden; display: flex; flex-direction: column; width: 100%; min-width: 0; }
 
     /* Board header */
     .board-header {
@@ -22,14 +22,16 @@
     /* Kanban scroll area */
     .kanban-area {
       display: flex; gap: 14px; padding: 20px;
-      overflow-x: auto; flex: 1; align-items: flex-start;
+      overflow-x: auto; overflow-y: hidden; flex: 1; align-items: flex-start;
+      width: 100%;
+      min-width: 0;
     }
     .kanban-area::-webkit-scrollbar { height: 6px; }
 
     /* Lista */
     .list-col {
       background: var(--bg2); border: 1px solid var(--border);
-      border-radius: var(--radius-lg); width: 280px; flex-shrink: 0;
+      border-radius: var(--radius-lg); width: 300px; min-width: 300px; flex-shrink: 0;
       display: flex; flex-direction: column; max-height: calc(100vh - 160px);
     }
     .list-header {
@@ -62,10 +64,11 @@
     .card-item {
       background: var(--bg3); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 12px;
-      cursor: pointer; transition: all .18s;
+      cursor: pointer; transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
       position: relative; user-select: none;
+      min-height: 94px;
     }
-    .card-item:hover { border-color: var(--accent); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+    .card-item:hover { border-color: var(--accent); transform: translateY(-2px) scale(1.01); box-shadow: var(--shadow-sm); }
     .card-item.dragging { opacity: .4; transform: rotate(1.5deg); }
     .card-cover { height: 6px; border-radius: 3px; margin-bottom: 8px; }
     .card-title { font-weight: 600; font-size: .875rem; line-height: 1.4; }
@@ -94,7 +97,7 @@
 
     /* Adicionar lista */
     .add-list-col {
-      width: 280px; flex-shrink: 0;
+      width: 300px; min-width: 300px; flex-shrink: 0;
     }
     .add-list-btn {
       display: flex; align-items: center; gap: 8px;
