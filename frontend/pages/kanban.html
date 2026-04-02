@@ -139,8 +139,8 @@
 <script src="../js/supabase.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
-const BOARD_ID = params.get('board');
-const WS_ID    = params.get('ws');
+const BOARD_ID = params.get('board') || sessionStorage.getItem('lastBoardId');
+const WS_ID    = params.get('ws') || localStorage.getItem('activeWorkspace');
 
 let board = null, lists = [], cards = [], members = [], labels = [];
 let dragCard = null, dragSourceListId = null;
@@ -149,9 +149,25 @@ let activeFilters = { member: null, label: null, status: null };
 
 async function init() {
   await initTopbar(WS_ID);
-  if (!BOARD_ID) { window.location.href = '/pages/dashboard.html'; return; }
+
+  if (!BOARD_ID) {
+    toast('Board não informado na URL', 'error');
+    document.getElementById('main').innerHTML = `
+      <div class="empty-state">
+        <div class="icon">🧭</div>
+        <h2>Board não encontrado</h2>
+        <p>Volte ao dashboard e abra o board novamente.</p>
+        <a class="btn btn-primary mt-4" href="/pages/dashboard.html?ws=${WS_ID || ''}">Voltar ao dashboard</a>
+      </div>`;
+    return;
+  }
 
   await loadAll();
+  if (!board) {
+    toast('Sem acesso ao board ou board inexistente', 'error');
+    window.location.href = `/pages/dashboard.html?ws=${WS_ID || ''}`;
+    return;
+  }
   render();
 }
 
@@ -160,7 +176,7 @@ async function loadAll() {
     { data: b }, { data: ls }, { data: cs },
     { data: ms }, { data: lbs }
   ] = await Promise.all([
-    db.from('boards').select('*').eq('id', BOARD_ID).single(),
+    db.from('boards').select('*').eq('id', BOARD_ID).maybeSingle(),
     db.from('lists').select('*').eq('board_id', BOARD_ID).eq('is_archived', false).order('position'),
     db.from('cards').select(`
       id, title, status, position, due_date, cover_color, list_id, is_archived,

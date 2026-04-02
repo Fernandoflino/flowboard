@@ -264,7 +264,7 @@
     const bg = b.background?.value || 'linear-gradient(135deg,#2a4299,#4f7cff)';
     const vis = { workspace: '🌐', private: '🔒', public: '🌍' }[b.visibility] || '';
     return `
-      <a class="board-card" href="/pages/kanban.html?board=${b.id}&ws=${currentWorkspaceId}" onclick="openBoard(event, '${b.id}')" title="Abrir board">
+      <a class="board-card" href="/pages/kanban.html?board=${b.id}&ws=${currentWorkspaceId}" onclick="rememberBoard('${b.id}')" title="Abrir board">
         <div class="board-cover" style="background:${bg}"></div>
         <div class="board-info">
           <div class="board-name">${b.name}</div>
@@ -297,6 +297,10 @@
     if (evt?.stopPropagation) evt.stopPropagation();
 
     window.location.href = `/pages/kanban.html?board=${boardId}&ws=${currentWorkspaceId}`;
+  }
+
+  function rememberBoard(boardId) {
+    try { sessionStorage.setItem('lastBoardId', boardId); } catch (_) {}
   }
 
   function renderNoWorkspace() {
