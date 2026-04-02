@@ -270,9 +270,33 @@
           <div class="board-name">${b.name}</div>
           <div class="board-meta">
             <span class="text-sm text-muted">${vis} ${b.visibility}</span>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="openBoard(event, '${b.id}')">Abrir</button>
+            <span class="btn btn-ghost btn-sm" style="margin-left:auto">Abrir</span>
           </div>
         </div>
-      </a>`;
+      </button>`;
+  }
+
+  function openBoard(boardId) {
+    window.location.href = `/pages/kanban.html?board=${boardId}&ws=${currentWorkspaceId}`;
+  }
+
+  function openBoard(event, boardId) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    window.location.href = `/pages/kanban.html?board=${boardId}&ws=${currentWorkspaceId}`;
+  }
+
+  function openBoard(eventOrBoardId, maybeBoardId) {
+    const boardId = maybeBoardId || eventOrBoardId;
+    const evt = (eventOrBoardId && typeof eventOrBoardId === 'object') ? eventOrBoardId : null;
+
+    if (evt?.preventDefault) evt.preventDefault();
+    if (evt?.stopPropagation) evt.stopPropagation();
+
+    window.location.href = `/pages/kanban.html?board=${boardId}&ws=${currentWorkspaceId}`;
   }
 
   function rememberBoard(boardId) {
