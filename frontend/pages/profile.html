@@ -17,6 +17,15 @@
     }
     .avatar-upload:hover .avatar-upload-overlay { opacity: 1; }
     .role-badge { padding: 3px 12px; border-radius: 99px; font-size: .75rem; font-weight: 700; }
+
+    @media (max-width: 980px) {
+      .profile-layout { grid-template-columns: 1fr; max-width: 100%; }
+    }
+    @media (max-width: 640px) {
+      .profile-card { align-items: flex-start; text-align: left; }
+      .panel { padding: 16px; }
+      .text-sm { word-break: break-word; }
+    }
   </style>
 </head>
 <body>

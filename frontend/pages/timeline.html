@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FlowBoard • Timeline</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase.js"></script>
+  <style>
+    .tl-row{display:grid;grid-template-columns:280px 1fr;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
+    .tl-track{position:relative;height:24px;background:var(--bg2);border-radius:999px;overflow:hidden}
+    .tl-bar{position:absolute;height:100%;background:linear-gradient(90deg,#2563eb,#0ea5e9);border-radius:999px}
+    .tl-bar.overdue{background:linear-gradient(90deg,#dc2626,#ef4444)}
+  </style>
+</head>
+<body>
+  <header class="topbar" id="topbar"></header>
+  <main class="container" style="padding:20px 28px 32px;display:flex;flex-direction:column;gap:12px;">
+    <div class="flex-between">
+      <div>
+        <h1 style="font-size:1.3rem">📈 Timeline</h1>
+        <p class="text-muted text-sm">Linha do tempo de cartões com início e entrega.</p>
+      </div>
+      <a id="back-link" class="btn btn-ghost btn-sm" href="#">← Voltar ao dashboard</a>
+    </div>
+    <div id="content" class="card" style="padding:14px"></div>
+  </main>
+
+<script>
+let WS_ID = null;
+
+async function init(){
+  const qs = new URLSearchParams(location.search);
+  WS_ID = qs.get('ws') || localStorage.getItem('activeWorkspace');
+  await initTopbar(WS_ID);
+  WS_ID = App.workspace?.id || WS_ID;
+  document.getElementById('back-link').href = `/pages/dashboard.html?ws=${WS_ID}`;
+
+  const { data, error } = await db.from('v_cards_full')
+    .select('card_id,card_title,board_name,start_date,due_date,card_status,is_overdue')
+    .eq('workspace_id', WS_ID)
+    .eq('is_archived', false)
+    .not('start_date','is',null)
+    .not('due_date','is',null)
+    .order('start_date', {ascending:true});
+
+  if(error){ toast(error.message,'error'); return; }
+  render(data || []);
+}
+
+function render(rows){
+  const root = document.getElementById('content');
+  if(!rows.length){
+    root.innerHTML = '<p class="text-muted">Nenhum cartão com início e entrega definidos.</p>';
+    return;
+  }
+
+  const min = Math.min(...rows.map(r => new Date(r.start_date).getTime()));
+  const max = Math.max(...rows.map(r => new Date(r.due_date).getTime()));
+  const span = Math.max(1, max-min);
+
+  root.innerHTML = rows.map(r => {
+    const s = new Date(r.start_date).getTime();
+    const e = new Date(r.due_date).getTime();
+    const left = ((s-min)/span)*100;
+    const width = Math.max(1, ((e-s)/span)*100);
+    const cls = r.is_overdue ? 'tl-bar overdue' : 'tl-bar';
+    return `
+      <div class="tl-row">
+        <div>
+          <div style="font-weight:600">${r.card_title}</div>
+          <div class="text-muted text-sm">${r.board_name} • ${fmtDate(r.start_date)} → ${fmtDate(r.due_date)}</div>
+        </div>
+        <div class="tl-track" title="${fmtDateTime(r.start_date)} - ${fmtDateTime(r.due_date)}">
+          <div class="${cls}" style="left:${left}%;width:${width}%"></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+init();
+</script>
+</body>
+</html>
