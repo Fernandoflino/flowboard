@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlowBoard — Meu Perfil</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .profile-layout { display: grid; grid-template-columns: 280px 1fr; gap: 24px; max-width: 900px; margin: 0 auto; }
+    .profile-card { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+    .avatar-upload { position: relative; cursor: pointer; }
+    .avatar-upload .avatar { width: 80px; height: 80px; font-size: 1.8rem; }
+    .avatar-upload-overlay {
+      position: absolute; inset: 0; border-radius: 50%;
+      background: rgba(0,0,0,.5); display: flex; align-items: center;
+      justify-content: center; opacity: 0; transition: opacity .2s; font-size: .75rem;
+    }
+    .avatar-upload:hover .avatar-upload-overlay { opacity: 1; }
+    .role-badge { padding: 3px 12px; border-radius: 99px; font-size: .75rem; font-weight: 700; }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar" id="topbar"></header>
+  <nav style="display:none"></nav>
+  <main class="main-content" id="main">
+    <div class="loading-screen"><div class="spinner"></div></div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/supabase.js"></script>
+<script>
+async function init() {
+  const session = await requireAuth();
+  if (!session) return;
+  const ws = localStorage.getItem('activeWorkspace');
+  await initTopbar(ws);
+  render();
+}
+
+function render() {
+  const p = App.profile;
+  const roleColors = { MASTER: 'badge-yellow', ADMIN: 'badge-blue', MEMBER: 'badge-green', VIEWER: 'badge-gray' };
+  document.getElementById('main').innerHTML = `
+    <div style="max-width:900px;margin:0 auto">
+      <h1 style="margin-bottom:24px;font-size:1.3rem">👤 Meu Perfil</h1>
+      <div class="profile-layout">
+        <!-- Lado esquerdo -->
+        <div class="panel" style="text-align:center">
+          <label class="avatar-upload" title="Clique para trocar foto">
+            ${p?.avatar_url
+              ? `<div class="avatar" style="width:80px;height:80px"><img src="${p.avatar_url}"></div>`
+              : `<div class="avatar" style="width:80px;height:80px;font-size:1.8rem;margin:0 auto">${(p?.full_name||'?')[0].toUpperCase()}</div>`}
+            <div class="avatar-upload-overlay">📷</div>
+            <input type="file" accept="image/*" style="display:none" onchange="uploadAvatar(this)">
+          </label>
+          <h2 style="margin-top:12px;font-size:1.1rem">${p?.full_name || ''}</h2>
+          <p class="text-sm text-muted">${App.user?.email}</p>
+          <span class="badge ${roleColors[p?.global_role] || 'badge-gray'}" style="margin-top:8px">${p?.global_role}</span>
+          <div class="divider" style="margin:16px 0"></div>
+          <p class="text-sm text-muted">Conta criada em ${fmtDate(p?.created_at)}</p>
+        </div>
+
+        <!-- Lado direito -->
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="panel">
+            <h3 style="margin-bottom:16px">Informações pessoais</h3>
+            <div style="display:flex;flex-direction:column;gap:14px">
+              <div class="input-group">
+                <label>Nome completo</label>
+                <input class="input" id="profile-name" value="${p?.full_name || ''}">
+              </div>
+              <div class="input-group">
+                <label>E-mail</label>
+                <input class="input" value="${App.user?.email}" disabled style="opacity:.6">
+                <small>O e-mail não pode ser alterado por aqui.</small>
+              </div>
+              <button class="btn btn-primary" onclick="saveProfile()">Salvar alterações</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3 style="margin-bottom:16px">Alterar senha</h3>
+            <div style="display:flex;flex-direction:column;gap:14px">
+              <div class="input-group">
+                <label>Nova senha</label>
+                <input class="input" type="password" id="new-password" placeholder="Mínimo 6 caracteres">
+              </div>
+              <div class="input-group">
+                <label>Confirmar nova senha</label>
+                <input class="input" type="password" id="confirm-password" placeholder="Repita a senha">
+              </div>
+              <button class="btn btn-ghost" onclick="changePassword()">Alterar senha</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function saveProfile() {
+  const name = document.getElementById('profile-name').value.trim();
+  if (!name) { toast('Nome não pode estar vazio', 'error'); return; }
+  const { error } = await db.from('profiles').update({ full_name: name }).eq('id', App.user.id);
+  if (error) { toast(error.message, 'error'); return; }
+  App.profile.full_name = name;
+  toast('Perfil atualizado!', 'success');
+  render();
+}
+
+async function changePassword() {
+  const np = document.getElementById('new-password').value;
+  const cp = document.getElementById('confirm-password').value;
+  if (!np) { toast('Digite a nova senha', 'error'); return; }
+  if (np.length < 6) { toast('Senha deve ter ao menos 6 caracteres', 'error'); return; }
+  if (np !== cp) { toast('As senhas não coincidem', 'error'); return; }
+  const { error } = await db.auth.updateUser({ password: np });
+  if (error) { toast(error.message, 'error'); return; }
+  toast('Senha alterada com sucesso!', 'success');
+}
+
+async function uploadAvatar(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const path = `${App.user.id}/${Date.now()}-${file.name}`;
+  const { error: upErr } = await db.storage.from('avatars').upload(path, file, { upsert: true });
+  if (upErr) { toast('Erro no upload', 'error'); return; }
+  const { data } = db.storage.from('avatars').getPublicUrl(path);
+  await db.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', App.user.id);
+  App.profile.avatar_url = data.publicUrl;
+  toast('Foto atualizada!', 'success');
+  render();
+}
+
+init();
+</script>
+</body>
+</html>

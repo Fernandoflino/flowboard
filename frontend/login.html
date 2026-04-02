@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlowBoard — Entrar</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh;
+           background: var(--bg); }
+
+    /* Grade decorativa de fundo */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: .35;
+    }
+
+    .login-wrap {
+      position: relative; z-index: 1;
+      width: 100%; max-width: 420px; padding: 20px;
+    }
+    .login-logo {
+      font-family: var(--font-display); font-size: 2rem; font-weight: 800;
+      color: var(--accent); text-align: center; letter-spacing: -.03em;
+      margin-bottom: 6px;
+    }
+    .login-logo span { color: var(--text); }
+    .login-tagline {
+      text-align: center; color: var(--text3); font-size: .85rem;
+      margin-bottom: 32px;
+    }
+    .login-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .login-tabs {
+      display: flex; border-bottom: 1px solid var(--border);
+    }
+    .login-tab {
+      flex: 1; padding: 14px; text-align: center;
+      font-weight: 600; font-size: .875rem; color: var(--text3);
+      cursor: pointer; transition: all .18s;
+      border-bottom: 2px solid transparent;
+    }
+    .login-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--accent-glow); }
+    .login-body { padding: 28px; display: flex; flex-direction: column; gap: 16px; }
+
+    .btn-full { width: 100%; justify-content: center; padding: 11px; font-size: .95rem; }
+    .btn-loading { opacity: .7; pointer-events: none; }
+
+    .or-divider {
+      display: flex; align-items: center; gap: 12px;
+      color: var(--text3); font-size: .8rem;
+    }
+    .or-divider::before, .or-divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    .forgot { text-align: right; font-size: .8rem; color: var(--accent); cursor: pointer; }
+    .forgot:hover { text-decoration: underline; }
+
+    /* Glow no botão */
+    .btn-primary.btn-full:hover {
+      box-shadow: 0 0 30px var(--accent-glow), 0 4px 16px rgba(79,124,255,.3);
+    }
+
+    /* Animação de entrada */
+    .login-card { animation: fadeUp .5s ease; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-logo">FLOW<span>BOARD</span></div>
+    <p class="login-tagline">Gestão de tarefas corporativa</p>
+
+    <div class="login-card">
+      <div class="login-tabs">
+        <div class="login-tab active" onclick="switchTab('login')">Entrar</div>
+        <div class="login-tab" onclick="switchTab('register')">Criar conta</div>
+      </div>
+
+      <!-- LOGIN -->
+      <div id="tab-login" class="login-body">
+        <div class="input-group">
+          <label>E-mail</label>
+          <input class="input" type="email" id="login-email" placeholder="seu@email.com" autocomplete="email">
+        </div>
+        <div class="input-group">
+          <label>Senha</label>
+          <input class="input" type="password" id="login-password" placeholder="••••••••"
+                 onkeydown="if(event.key==='Enter') doLogin()">
+          <div class="forgot" onclick="openModal('modal-forgot')">Esqueci minha senha</div>
+        </div>
+        <button class="btn btn-primary btn-full" id="btn-login" onclick="doLogin()">
+          Entrar
+        </button>
+      </div>
+
+      <!-- CADASTRO -->
+      <div id="tab-register" class="login-body hidden">
+        <div class="input-group">
+          <label>Nome completo</label>
+          <input class="input" type="text" id="reg-name" placeholder="João Silva">
+        </div>
+        <div class="input-group">
+          <label>E-mail</label>
+          <input class="input" type="email" id="reg-email" placeholder="seu@email.com">
+        </div>
+        <div class="input-group">
+          <label>Senha</label>
+          <input class="input" type="password" id="reg-password" placeholder="Mínimo 6 caracteres"
+                 onkeydown="if(event.key==='Enter') doRegister()">
+        </div>
+        <button class="btn btn-primary btn-full" id="btn-register" onclick="doRegister()">
+          Criar conta
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL RECUPERAR SENHA -->
+  <div class="modal-overlay" id="modal-forgot">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Recuperar senha</h3>
+        <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-forgot')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted text-sm">Digite seu e-mail e enviaremos um link para redefinir sua senha.</p>
+        <div class="input-group">
+          <label>E-mail</label>
+          <input class="input" type="email" id="forgot-email" placeholder="seu@email.com">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-forgot')">Cancelar</button>
+        <button class="btn btn-primary" onclick="doForgot()">Enviar link</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="../js/supabase.js"></script>
+  <script>
+    // Redirecionar se já logado
+    (async () => {
+      const session = await getSession();
+      if (session) window.location.href = '/pages/dashboard.html';
+    })();
+
+    function switchTab(tab) {
+      document.querySelectorAll('.login-tab').forEach((t,i) => {
+        t.classList.toggle('active', (i===0 && tab==='login') || (i===1 && tab==='register'));
+      });
+      document.getElementById('tab-login').classList.toggle('hidden', tab !== 'login');
+      document.getElementById('tab-register').classList.toggle('hidden', tab !== 'register');
+    }
+
+    async function doLogin() {
+      const email = document.getElementById('login-email').value.trim();
+      const pwd   = document.getElementById('login-password').value;
+      if (!email || !pwd) { toast('Preencha e-mail e senha', 'error'); return; }
+
+      const btn = document.getElementById('btn-login');
+      btn.innerHTML = '<div class="spinner"></div> Entrando...';
+      btn.classList.add('btn-loading');
+
+      const { error } = await db.auth.signInWithPassword({ email, password: pwd });
+      if (error) {
+        toast(error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos' : error.message, 'error');
+        btn.innerHTML = 'Entrar'; btn.classList.remove('btn-loading');
+      } else {
+        window.location.href = '/pages/dashboard.html';
+      }
+    }
+
+    async function doRegister() {
+      const name  = document.getElementById('reg-name').value.trim();
+      const email = document.getElementById('reg-email').value.trim();
+      const pwd   = document.getElementById('reg-password').value;
+      if (!name || !email || !pwd) { toast('Preencha todos os campos', 'error'); return; }
+      if (pwd.length < 6) { toast('Senha deve ter ao menos 6 caracteres', 'error'); return; }
+
+      const btn = document.getElementById('btn-register');
+      btn.innerHTML = '<div class="spinner"></div> Criando conta...';
+      btn.classList.add('btn-loading');
+
+      const { error } = await db.auth.signUp({
+        email, password: pwd,
+        options: { data: { full_name: name } }
+      });
+
+      if (error) {
+        toast(error.message, 'error');
+        btn.innerHTML = 'Criar conta'; btn.classList.remove('btn-loading');
+      } else {
+        toast('Conta criada! Faça login.', 'success');
+        switchTab('login');
+        document.getElementById('login-email').value = email;
+        btn.innerHTML = 'Criar conta'; btn.classList.remove('btn-loading');
+      }
+    }
+
+    async function doForgot() {
+      const email = document.getElementById('forgot-email').value.trim();
+      if (!email) { toast('Digite seu e-mail', 'error'); return; }
+      const { error } = await db.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/pages/reset-password.html'
+      });
+      if (error) toast(error.message, 'error');
+      else { toast('Link enviado para ' + email, 'success'); closeModal('modal-forgot'); }
+    }
+  </script>
+</body>
+</html>

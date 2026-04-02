@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlowBoard — Relatórios</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .reports-layout { display: grid; grid-template-columns: 220px 1fr; gap: 0; flex: 1; overflow: hidden; }
+    .reports-nav { border-right: 1px solid var(--border); padding: 16px 12px; background: var(--bg2); }
+    .reports-content { overflow-y: auto; padding: 28px; }
+
+    .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+    .metric-box { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; }
+    .metric-value { font-family: var(--font-display); font-size: 2.2rem; font-weight: 800; line-height: 1; }
+    .metric-label { font-size: .78rem; color: var(--text2); margin-top: 5px; }
+    .metric-sub   { font-size: .75rem; color: var(--text3); margin-top: 8px; }
+
+    .report-section { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 22px; margin-bottom: 20px; }
+    .report-section h3 { margin-bottom: 16px; font-size: 1rem; }
+
+    /* Tabela */
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    thead th { padding: 8px 12px; text-align: left; font-size: .72rem; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); }
+    tbody td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: var(--bg3); }
+    td .assignees-mini { display: flex; gap: -4px; }
+
+    /* Barra horizontal */
+    .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .bar-label { font-size: .8rem; min-width: 100px; text-align: right; color: var(--text2); }
+    .bar-track { flex: 1; height: 10px; background: var(--bg4); border-radius: 99px; overflow: hidden; }
+    .bar-fill   { height: 100%; border-radius: 99px; transition: width .6s cubic-bezier(.34,1.56,.64,1); }
+    .bar-count  { font-size: .8rem; color: var(--text3); min-width: 28px; }
+
+    /* Filtros */
+    .filter-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; align-items: flex-end; }
+    .filter-row .input-group { flex: 1; min-width: 140px; }
+    .filter-row label { font-size: .72rem; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; }
+
+    /* Export */
+    .export-btn { font-size: .8rem; }
+
+    @media (max-width: 768px) {
+      .reports-layout { grid-template-columns: 1fr; }
+      .reports-nav { display: none; }
+      .metrics-grid { grid-template-columns: repeat(2,1fr); }
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar" id="topbar"></header>
+  <nav style="display:none"></nav>
+  <main class="main-content" id="main" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
+    <div class="loading-screen"><div class="spinner"></div></div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/supabase.js"></script>
+<script>
+const params  = new URLSearchParams(location.search);
+const WS_ID   = params.get('ws');
+const BOARD_ID= params.get('board');
+
+let allCards = [], boards = [], members = [];
+let filters = {
+  from: new Date(Date.now() - 30*86400000).toISOString().slice(0,10),
+  to:   new Date().toISOString().slice(0,10),
+  board: BOARD_ID || '',
+  member: '',
+  status: '',
+};
+
+async function init() {
+  await initTopbar(WS_ID);
+  await loadData();
+  render();
+}
+
+async function loadData() {
+  let q = db.from('v_cards_full').select('*').eq('workspace_id', WS_ID);
+  if (filters.from)   q = q.gte('card_created_at', filters.from);
+  if (filters.to)     q = q.lte('card_created_at', filters.to + 'T23:59:59');
+  if (filters.board)  q = q.eq('board_id', filters.board);
+  if (filters.status) q = q.eq('card_status', filters.status);
+  const { data } = await q;
+  allCards = data || [];
+
+  const [{ data: bs }, { data: ms }] = await Promise.all([
+    db.from('boards').select('id,name').eq('workspace_id', WS_ID),
+    db.from('workspace_members').select('user_id, profiles(full_name)').eq('workspace_id', WS_ID),
+  ]);
+  boards = bs || []; members = ms || [];
+}
+
+function filteredCards() {
+  if (!filters.member) return allCards;
+  return allCards.filter(c => {
+    const assignees = c.assignees || [];
+    return assignees.some(a => a.id === filters.member);
+  });
+}
+
+function render() {
+  const main = document.getElementById('main');
+  const cards = filteredCards();
+
+  const total    = cards.length;
+  const done     = cards.filter(c => c.card_status === 'completed').length;
+  const overdue  = cards.filter(c => c.is_overdue).length;
+  const donePct  = total ? Math.round(done/total*100) : 0;
+  const avgHrs   = (() => {
+    const completed = cards.filter(c => c.hours_to_complete > 0);
+    if (!completed.length) return null;
+    return (completed.reduce((s,c) => s + c.hours_to_complete, 0) / completed.length).toFixed(1);
+  })();
+
+  // Por usuário
+  const byUser = {};
+  cards.forEach(c => {
+    const assignees = Array.isArray(c.assignees) ? c.assignees : [];
+    assignees.forEach(a => {
+      if (!byUser[a.id]) byUser[a.id] = { name: a.name, total: 0, done: 0, overdue: 0 };
+      byUser[a.id].total++;
+      if (c.card_status === 'completed') byUser[a.id].done++;
+      if (c.is_overdue) byUser[a.id].overdue++;
+    });
+  });
+  const userList = Object.values(byUser).sort((a,b) => b.total - a.total);
+  const maxUser  = userList[0]?.total || 1;
+
+  // Por board
+  const byBoard = {};
+  cards.forEach(c => {
+    if (!byBoard[c.board_id]) byBoard[c.board_id] = { name: c.board_name, total: 0, done: 0 };
+    byBoard[c.board_id].total++;
+    if (c.card_status === 'completed') byBoard[c.board_id].done++;
+  });
+  const boardList = Object.values(byBoard).sort((a,b) => b.total - a.total);
+
+  main.innerHTML = `
+    <div class="reports-layout">
+      <!-- NAV LATERAL -->
+      <div class="reports-nav">
+        <div class="sidebar-section-title">Relatórios</div>
+        <div class="sidebar-item active">📊 Visão geral</div>
+        <a href="/pages/dashboard.html?ws=${WS_ID}" class="sidebar-item">⊞ Boards</a>
+      </div>
+
+      <!-- CONTEÚDO -->
+      <div class="reports-content">
+        <div class="flex-between" style="margin-bottom:20px">
+          <div>
+            <h1 style="font-size:1.3rem">📊 Relatório Executivo</h1>
+            <p class="text-muted text-sm">Workspace: ${App.workspace?.name || ''}</p>
+          </div>
+          <button class="btn btn-ghost export-btn" onclick="exportCSV()">⬇ Exportar CSV</button>
+        </div>
+
+        <!-- FILTROS -->
+        <div class="report-section">
+          <h3>Filtros</h3>
+          <div class="filter-row">
+            <div class="input-group">
+              <label>De</label>
+              <input type="date" class="input" value="${filters.from}" onchange="filters.from=this.value">
+            </div>
+            <div class="input-group">
+              <label>Até</label>
+              <input type="date" class="input" value="${filters.to}" onchange="filters.to=this.value">
+            </div>
+            <div class="input-group">
+              <label>Board</label>
+              <select class="input" onchange="filters.board=this.value">
+                <option value="">Todos</option>
+                ${boards.map(b => `<option value="${b.id}" ${filters.board===b.id?'selected':''}>${b.name}</option>`).join('')}
+              </select>
+            </div>
+            <div class="input-group">
+              <label>Membro</label>
+              <select class="input" onchange="filters.member=this.value">
+                <option value="">Todos</option>
+                ${members.map(m => `<option value="${m.user_id}">${m.profiles?.full_name}</option>`).join('')}
+              </select>
+            </div>
+            <div class="input-group">
+              <label>Status</label>
+              <select class="input" onchange="filters.status=this.value">
+                <option value="">Todos</option>
+                <option value="active">Ativo</option>
+                <option value="completed">Concluído</option>
+                <option value="overdue">Atrasado</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" onclick="applyFilters()">Filtrar</button>
+          </div>
+        </div>
+
+        <!-- MÉTRICAS -->
+        <div class="metrics-grid">
+          <div class="metric-box">
+            <div class="metric-value">${total}</div>
+            <div class="metric-label">Total de cartões</div>
+            <div class="metric-sub">No período selecionado</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-value" style="color:var(--green)">${done}</div>
+            <div class="metric-label">Concluídos</div>
+            <div class="metric-sub">${donePct}% de conclusão</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-value" style="color:var(--red)">${overdue}</div>
+            <div class="metric-label">Atrasados</div>
+            <div class="metric-sub">${total ? Math.round(overdue/total*100) : 0}% do total</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-value" style="color:var(--accent)">${avgHrs ? avgHrs+'h' : '—'}</div>
+            <div class="metric-label">Tempo médio de conclusão</div>
+            <div class="metric-sub">Cartões concluídos</div>
+          </div>
+        </div>
+
+        <!-- POR USUÁRIO -->
+        ${userList.length ? `
+        <div class="report-section">
+          <h3>Cartões por responsável</h3>
+          ${userList.map(u => `
+            <div class="bar-row">
+              <span class="bar-label">${u.name}</span>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${Math.round(u.total/maxUser*100)}%;background:var(--accent)"></div>
+              </div>
+              <span class="bar-count">${u.total}</span>
+              <span class="badge badge-green" style="font-size:.68rem">${u.done} ✓</span>
+              ${u.overdue ? `<span class="badge badge-red" style="font-size:.68rem">${u.overdue} atrasado</span>` : ''}
+            </div>`).join('')}
+        </div>` : ''}
+
+        <!-- POR BOARD -->
+        ${boardList.length > 1 ? `
+        <div class="report-section">
+          <h3>Cartões por board</h3>
+          ${boardList.map(b => `
+            <div class="bar-row">
+              <span class="bar-label">${b.name}</span>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${Math.round(b.total/boardList[0].total*100)}%;background:var(--purple)"></div>
+              </div>
+              <span class="bar-count">${b.total}</span>
+              <span class="badge badge-green" style="font-size:.68rem">${b.done} ✓</span>
+            </div>`).join('')}
+        </div>` : ''}
+
+        <!-- TABELA DETALHADA -->
+        <div class="report-section">
+          <h3>Lista de cartões (${cards.length})</h3>
+          <div style="overflow-x:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cartão</th>
+                  <th>Board / Lista</th>
+                  <th>Status</th>
+                  <th>Responsáveis</th>
+                  <th>Entrega</th>
+                  <th>Concluído em</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${cards.map(c => {
+                  const assignees = Array.isArray(c.assignees) ? c.assignees : [];
+                  return `
+                  <tr>
+                    <td>
+                      <a href="/pages/card.html?card=${c.card_id}&board=${c.board_id}&ws=${c.workspace_id}"
+                         style="color:var(--accent);font-weight:500">${c.card_title}</a>
+                      ${c.is_overdue ? '<span class="badge badge-red" style="margin-left:5px;font-size:.65rem">Atrasado</span>' : ''}
+                    </td>
+                    <td class="text-muted">${c.board_name} / ${c.list_name}</td>
+                    <td>${statusBadge(c.card_status)}</td>
+                    <td>
+                      <div style="display:flex;gap:-4px">
+                        ${assignees.slice(0,3).map(a => avatarHtml(a.name, null, 'avatar-sm')).join('')}
+                        ${assignees.length > 3 ? `<div class="avatar avatar-sm">+${assignees.length-3}</div>` : ''}
+                      </div>
+                    </td>
+                    <td class="${c.is_overdue?'text-muted':'text-muted'}" style="${c.is_overdue?'color:var(--red)':''}">${fmtDate(c.due_date)}</td>
+                    <td class="text-muted">${fmtDate(c.completed_at)}</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function applyFilters() {
+  document.getElementById('main').innerHTML = '<div class="loading-screen"><div class="spinner"></div></div>';
+  await loadData();
+  render();
+}
+
+function exportCSV() {
+  const cards = filteredCards();
+  const rows = [
+    ['Cartão','Board','Lista','Status','Entrega','Concluído em','Responsáveis','Atrasado'],
+    ...cards.map(c => [
+      c.card_title, c.board_name, c.list_name, c.card_status,
+      c.due_date || '', c.completed_at || '',
+      (Array.isArray(c.assignees) ? c.assignees.map(a=>a.name).join('; ') : ''),
+      c.is_overdue ? 'Sim' : 'Não'
+    ])
+  ];
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `relatorio-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+init();
+</script>
+</body>
+</html>

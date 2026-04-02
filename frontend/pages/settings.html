@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlowBoard — Configurações</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .settings-layout { display: grid; grid-template-columns: 200px 1fr; gap: 24px; max-width: 860px; margin: 0 auto; }
+    .settings-nav .sidebar-item { border-radius: var(--radius); }
+    .settings-section { display: none; }
+    .settings-section.active { display: flex; flex-direction: column; gap: 20px; }
+    .danger-zone { border: 1px solid rgba(239,68,68,.3); border-radius: var(--radius-lg); padding: 20px; }
+    .danger-zone h3 { color: var(--red); margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar" id="topbar"></header>
+  <nav style="display:none"></nav>
+  <main class="main-content" id="main">
+    <div class="loading-screen"><div class="spinner"></div></div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/supabase.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const WS_ID  = params.get('ws');
+let workspace = null;
+
+async function init() {
+  await initTopbar(WS_ID);
+  const { data } = await db.from('workspaces').select('*').eq('id', WS_ID).single();
+  workspace = data;
+  render();
+}
+
+function render() {
+  document.getElementById('main').innerHTML = `
+    <div style="max-width:860px;margin:0 auto">
+      <div class="flex-between" style="margin-bottom:24px">
+        <h1 style="font-size:1.3rem">⚙ Configurações do Workspace</h1>
+        <a href="/pages/dashboard.html?ws=${WS_ID}" class="btn btn-ghost btn-sm">← Voltar</a>
+      </div>
+
+      <div class="settings-layout">
+        <!-- Nav -->
+        <nav class="settings-nav">
+          <div class="sidebar-item active" onclick="showSection('general', this)">🏢 Geral</div>
+          <div class="sidebar-item" onclick="showSection('labels', this)">🏷 Etiquetas</div>
+          <div class="sidebar-item" onclick="showSection('danger', this)" style="color:var(--red)">⚠ Zona de perigo</div>
+        </nav>
+
+        <!-- Seções -->
+        <div>
+          <!-- GERAL -->
+          <div class="settings-section active" id="section-general">
+            <div class="panel">
+              <h3 style="margin-bottom:16px">Informações gerais</h3>
+              <div style="display:flex;flex-direction:column;gap:14px">
+                <div class="input-group">
+                  <label>Nome do workspace</label>
+                  <input class="input" id="ws-name" value="${workspace?.name || ''}">
+                </div>
+                <div class="input-group">
+                  <label>Descrição</label>
+                  <textarea class="input" id="ws-desc" rows="3">${workspace?.description || ''}</textarea>
+                </div>
+                <button class="btn btn-primary" style="align-self:flex-start" onclick="saveGeneral()">Salvar</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ETIQUETAS GLOBAIS -->
+          <div class="settings-section" id="section-labels">
+            <div class="panel">
+              <h3 style="margin-bottom:4px">Etiquetas por Board</h3>
+              <p class="text-muted text-sm" style="margin-bottom:16px">As etiquetas são criadas por board, dentro de cada quadro Kanban.</p>
+              <a href="/pages/dashboard.html?ws=${WS_ID}" class="btn btn-ghost">Ir para os boards →</a>
+            </div>
+          </div>
+
+          <!-- ZONA DE PERIGO -->
+          <div class="settings-section" id="section-danger">
+            <div class="danger-zone">
+              <h3>⚠ Zona de perigo</h3>
+              <p class="text-muted text-sm" style="margin-bottom:16px">
+                Estas ações são <strong>irreversíveis</strong>. Tenha certeza antes de prosseguir.
+              </p>
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div class="panel panel-sm" style="display:flex;align-items:center;justify-content:space-between">
+                  <div>
+                    <div style="font-weight:600;font-size:.875rem">Excluir workspace</div>
+                    <div class="text-sm text-muted">Remove permanentemente o workspace e todos os dados.</div>
+                  </div>
+                  <button class="btn btn-danger btn-sm" onclick="deleteWorkspace()">Excluir</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function showSection(id, el) {
+  document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.settings-nav .sidebar-item').forEach(i => i.classList.remove('active'));
+  document.getElementById(`section-${id}`)?.classList.add('active');
+  el.classList.add('active');
+}
+
+async function saveGeneral() {
+  const name = document.getElementById('ws-name').value.trim();
+  const desc = document.getElementById('ws-desc').value.trim() || null;
+  if (!name) { toast('Nome não pode ser vazio', 'error'); return; }
+  const { error } = await db.from('workspaces').update({ name, description: desc }).eq('id', WS_ID);
+  if (error) { toast(error.message, 'error'); return; }
+  workspace.name = name;
+  toast('Configurações salvas!', 'success');
+}
+
+async function deleteWorkspace() {
+  const confirm1 = confirm(`Tem certeza que deseja excluir "${workspace?.name}"?\nTODOS os boards, listas e cartões serão perdidos.`);
+  if (!confirm1) return;
+  const typed = prompt('Digite o nome do workspace para confirmar:');
+  if (typed !== workspace?.name) { toast('Nome incorreto. Exclusão cancelada.', 'error'); return; }
+  const { error } = await db.from('workspaces').delete().eq('id', WS_ID);
+  if (error) { toast(error.message, 'error'); return; }
+  toast('Workspace excluído', 'success');
+  localStorage.removeItem('activeWorkspace');
+  setTimeout(() => window.location.href = '/pages/dashboard.html', 1200);
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlowBoard — Membros</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .members-table { width: 100%; border-collapse: collapse; }
+    .members-table th {
+      padding: 10px 16px; text-align: left;
+      font-size: .72rem; font-weight: 700; color: var(--text3);
+      text-transform: uppercase; letter-spacing: .06em;
+      border-bottom: 1px solid var(--border);
+    }
+    .members-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .members-table tr:last-child td { border-bottom: none; }
+    .members-table tr:hover td { background: var(--bg3); }
+
+    .role-select {
+      background: var(--bg3); border: 1px solid var(--border);
+      color: var(--text); border-radius: var(--radius); padding: 5px 8px;
+      font-size: .8rem; cursor: pointer;
+    }
+    .invite-box {
+      background: var(--bg2); border: 1px dashed var(--border2);
+      border-radius: var(--radius-lg); padding: 24px;
+      display: flex; gap: 12px; align-items: flex-end; margin-bottom: 24px;
+    }
+    .invite-box .input-group { flex: 1; }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar" id="topbar"></header>
+  <nav style="display:none"></nav>
+  <main class="main-content" id="main">
+    <div class="loading-screen"><div class="spinner"></div></div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/supabase.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const WS_ID  = params.get('ws');
+let members  = [];
+
+async function init() {
+  await initTopbar(WS_ID);
+  await load();
+  render();
+}
+
+async function load() {
+  const { data } = await db
+    .from('workspace_members')
+    .select('*, profiles(id, full_name, avatar_url, global_role, created_at)')
+    .eq('workspace_id', WS_ID)
+    .order('joined_at');
+  members = data || [];
+}
+
+function render() {
+  const myRole = members.find(m => m.user_id === App.user?.id)?.role;
+  const canManage = myRole === 'ADMIN' || App.profile?.global_role === 'MASTER';
+
+  document.getElementById('main').innerHTML = `
+    <div style="max-width:860px;margin:0 auto">
+      <div class="flex-between" style="margin-bottom:20px">
+        <div>
+          <h1 style="font-size:1.3rem">👥 Membros do Workspace</h1>
+          <p class="text-muted text-sm">${members.length} membro${members.length!==1?'s':''}</p>
+        </div>
+        <a href="/pages/dashboard.html?ws=${WS_ID}" class="btn btn-ghost btn-sm">← Voltar</a>
+      </div>
+
+      ${canManage ? `
+      <div class="invite-box">
+        <div class="input-group" style="flex:2">
+          <label>E-mail do novo membro</label>
+          <input class="input" id="invite-email" type="email" placeholder="usuario@email.com">
+        </div>
+        <div class="input-group">
+          <label>Função</label>
+          <select class="input" id="invite-role">
+            <option value="MEMBER">Membro</option>
+            <option value="ADMIN">Admin</option>
+            <option value="VIEWER">Visualizador</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="inviteMember()">Convidar</button>
+      </div>` : ''}
+
+      <div class="panel" style="padding:0;overflow:hidden">
+        <table class="members-table">
+          <thead>
+            <tr>
+              <th>Membro</th>
+              <th>Função</th>
+              <th>Entrou em</th>
+              ${canManage ? '<th>Ações</th>' : ''}
+            </tr>
+          </thead>
+          <tbody>
+            ${members.map(m => memberRow(m, canManage)).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function memberRow(m, canManage) {
+  const isSelf   = m.user_id === App.user?.id;
+  const isMaster = m.profiles?.global_role === 'MASTER';
+  const roleMap  = { ADMIN: 'badge-blue', MEMBER: 'badge-green', VIEWER: 'badge-gray', MASTER: 'badge-yellow' };
+  const displayRole = isMaster ? 'MASTER' : m.role;
+
+  return `
+    <tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          ${avatarHtml(m.profiles?.full_name, m.profiles?.avatar_url)}
+          <div>
+            <div style="font-weight:600;font-size:.875rem">${m.profiles?.full_name}</div>
+            ${isSelf ? '<div class="text-sm text-muted">Você</div>' : ''}
+          </div>
+        </div>
+      </td>
+      <td>
+        ${canManage && !isMaster && !isSelf ? `
+          <select class="role-select" onchange="changeRole('${m.user_id}', this.value)">
+            <option value="VIEWER"  ${m.role==='VIEWER' ?'selected':''}>Visualizador</option>
+            <option value="MEMBER"  ${m.role==='MEMBER' ?'selected':''}>Membro</option>
+            <option value="ADMIN"   ${m.role==='ADMIN'  ?'selected':''}>Admin</option>
+          </select>` :
+          `<span class="badge ${roleMap[displayRole]||'badge-gray'}">${displayRole}</span>`
+        }
+      </td>
+      <td class="text-muted text-sm">${fmtDate(m.joined_at)}</td>
+      ${canManage ? `
+        <td>
+          ${!isMaster && !isSelf ? `
+            <button class="btn btn-ghost btn-sm" style="color:var(--red)"
+              onclick="removeMember('${m.user_id}', '${m.profiles?.full_name}')">
+              Remover
+            </button>` : '<span class="text-muted text-sm">—</span>'}
+        </td>` : ''}
+    </tr>`;
+}
+
+async function inviteMember() {
+  const email = document.getElementById('invite-email').value.trim();
+  const role  = document.getElementById('invite-role').value;
+  if (!email) { toast('Digite o e-mail', 'error'); return; }
+
+  // Busca o usuário pelo e-mail
+  const { data: users, error } = await db
+    .from('profiles')
+    .select('id, full_name')
+    .eq('id', (await db.auth.admin?.listUsers())?.data?.users?.find(u => u.email === email)?.id);
+
+  // Como não temos acesso admin direto no frontend, buscamos via RPC ou join
+  // Alternativa: buscar profiles via email usando a função do Supabase Auth
+  // Na prática, o usuário precisa ter conta. Enviamos convite se não encontrar.
+  const { data: found } = await db.rpc('get_user_id_by_email', { p_email: email });
+
+  if (!found) {
+    toast('Usuário não encontrado. Peça que ele crie uma conta primeiro.', 'error');
+    return;
+  }
+
+  const { error: insertErr } = await db.from('workspace_members').insert({
+    workspace_id: WS_ID, user_id: found, role
+  });
+
+  if (insertErr) {
+    if (insertErr.code === '23505') toast('Este usuário já é membro', 'error');
+    else toast(insertErr.message, 'error');
+    return;
+  }
+
+  toast('Membro adicionado!', 'success');
+  document.getElementById('invite-email').value = '';
+  await load(); render();
+}
+
+async function changeRole(userId, newRole) {
+  const { error } = await db.from('workspace_members')
+    .update({ role: newRole })
+    .eq('workspace_id', WS_ID).eq('user_id', userId);
+  if (error) { toast(error.message, 'error'); return; }
+  toast('Função atualizada', 'success');
+  await load(); render();
+}
+
+async function removeMember(userId, name) {
+  if (!confirm(`Remover "${name}" do workspace?`)) return;
+  await db.from('workspace_members')
+    .delete().eq('workspace_id', WS_ID).eq('user_id', userId);
+  toast('Membro removido', 'success');
+  await load(); render();
+}
+
+init();
+</script>
+</body>
+</html>

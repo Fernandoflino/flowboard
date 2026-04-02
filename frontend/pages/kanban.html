@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlowBoard — Kanban</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    body { overflow: hidden; }
+    .app-shell { height: 100vh; overflow: hidden; }
+    .main-content { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+
+    /* Board header */
+    .board-header {
+      padding: 14px 20px; display: flex; align-items: center; gap: 12px;
+      background: rgba(0,0,0,.3); border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .board-header h2 { font-size: 1.1rem; }
+    .board-header-actions { margin-left: auto; display: flex; gap: 8px; }
+
+    /* Kanban scroll area */
+    .kanban-area {
+      display: flex; gap: 14px; padding: 20px;
+      overflow-x: auto; flex: 1; align-items: flex-start;
+    }
+    .kanban-area::-webkit-scrollbar { height: 6px; }
+
+    /* Lista */
+    .list-col {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); width: 280px; flex-shrink: 0;
+      display: flex; flex-direction: column; max-height: calc(100vh - 160px);
+    }
+    .list-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .list-title {
+      font-family: var(--font-display); font-weight: 700; font-size: .9rem;
+      cursor: pointer;
+    }
+    .list-title-input {
+      font-family: var(--font-display); font-weight: 700; font-size: .9rem;
+      background: var(--bg3); border: 1px solid var(--accent);
+      color: var(--text); padding: 2px 6px; border-radius: 4px; width: 100%;
+    }
+    .list-count {
+      background: var(--bg4); color: var(--text3);
+      font-size: .7rem; font-weight: 700; padding: 1px 7px; border-radius: 99px;
+    }
+
+    .cards-container {
+      overflow-y: auto; padding: 10px; display: flex;
+      flex-direction: column; gap: 8px; flex: 1;
+      min-height: 40px;
+    }
+    .cards-container.drag-over { background: var(--accent-glow); border-radius: var(--radius); }
+
+    /* Cartão */
+    .card-item {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px;
+      cursor: pointer; transition: all .18s;
+      position: relative; user-select: none;
+    }
+    .card-item:hover { border-color: var(--accent); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+    .card-item.dragging { opacity: .4; transform: rotate(1.5deg); }
+    .card-cover { height: 6px; border-radius: 3px; margin-bottom: 8px; }
+    .card-title { font-weight: 600; font-size: .875rem; line-height: 1.4; }
+    .card-labels { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+    .card-label-dot { height: 6px; border-radius: 3px; flex: 1; min-width: 32px; max-width: 48px; }
+    .card-footer { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+    .card-meta { font-size: .72rem; color: var(--text3); display: flex; align-items: center; gap: 3px; }
+    .card-meta.overdue { color: var(--red); }
+    .card-assignees { margin-left: auto; display: flex; }
+    .card-assignees .avatar { margin-left: -6px; border: 2px solid var(--bg3); }
+
+    /* Adicionar cartão */
+    .add-card-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 9px 14px; color: var(--text3); font-size: .85rem;
+      cursor: pointer; border-top: 1px solid var(--border);
+      transition: all .15s; flex-shrink: 0;
+    }
+    .add-card-btn:hover { color: var(--text); background: var(--bg3); border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+    .add-card-form { padding: 10px; border-top: 1px solid var(--border); flex-shrink: 0; }
+    .add-card-form textarea {
+      width: 100%; resize: none; padding: 8px 10px; font-size: .875rem;
+      border-radius: var(--radius); min-height: 64px;
+    }
+    .add-card-form-actions { display: flex; gap: 6px; margin-top: 6px; }
+
+    /* Adicionar lista */
+    .add-list-col {
+      width: 280px; flex-shrink: 0;
+    }
+    .add-list-btn {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 16px; color: var(--text3); font-size: .875rem;
+      background: rgba(255,255,255,.05); border: 1px dashed var(--border2);
+      border-radius: var(--radius-lg); cursor: pointer; transition: all .2s;
+      width: 100%;
+    }
+    .add-list-btn:hover { background: var(--bg2); color: var(--text); border-color: var(--accent); }
+    .add-list-form {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 12px; display: none;
+    }
+
+    /* Filtros */
+    .filter-bar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 20px; background: var(--bg); border-bottom: 1px solid var(--border);
+      flex-shrink: 0; overflow-x: auto;
+    }
+    .filter-chip {
+      display: flex; align-items: center; gap: 5px;
+      padding: 4px 10px; border-radius: 99px;
+      font-size: .78rem; font-weight: 600; cursor: pointer;
+      border: 1px solid var(--border); color: var(--text2);
+      white-space: nowrap; transition: all .15s;
+    }
+    .filter-chip:hover, .filter-chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar" id="topbar"></header>
+  <nav style="display:none"></nav><!-- placeholder grid -->
+  <main class="main-content" id="main">
+    <div class="loading-screen"><div class="spinner"></div></div>
+  </main>
+</div>
+
+<!-- MODAL DETALHES DO CARTÃO (abre card.html em iframe ou navega) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/supabase.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const BOARD_ID = params.get('board');
+const WS_ID    = params.get('ws');
+
+let board = null, lists = [], cards = [], members = [], labels = [];
+let dragCard = null, dragSourceListId = null;
+let activeFilters = { member: null, label: null, status: null };
+
+async function init() {
+  await initTopbar(WS_ID);
+  if (!BOARD_ID) { window.location.href = '/pages/dashboard.html'; return; }
+
+  await loadAll();
+  render();
+}
+
+async function loadAll() {
+  const [
+    { data: b }, { data: ls }, { data: cs },
+    { data: ms }, { data: lbs }
+  ] = await Promise.all([
+    db.from('boards').select('*').eq('id', BOARD_ID).single(),
+    db.from('lists').select('*').eq('board_id', BOARD_ID).eq('is_archived', false).order('position'),
+    db.from('cards').select(`
+      id, title, status, position, due_date, cover_color, list_id, is_archived,
+      card_members(user_id, profiles(full_name, avatar_url)),
+      card_labels(label_id, labels(name, color))
+    `).in('list_id', (await db.from('lists').select('id').eq('board_id', BOARD_ID)).data?.map(l=>l.id) || [])
+      .eq('is_archived', false).order('position'),
+    db.from('workspace_members').select('user_id, role, profiles(full_name, avatar_url)').eq('workspace_id', WS_ID),
+    db.from('labels').select('*').eq('board_id', BOARD_ID),
+  ]);
+
+  board = b; lists = ls || []; cards = cs || [];
+  members = ms || []; labels = lbs || [];
+}
+
+function filteredCards(listId) {
+  return cards.filter(c => {
+    if (c.list_id !== listId) return false;
+    if (activeFilters.status && c.status !== activeFilters.status) return false;
+    if (activeFilters.member && !c.card_members?.some(m => m.user_id === activeFilters.member)) return false;
+    if (activeFilters.label  && !c.card_labels?.some(l => l.label_id === activeFilters.label))  return false;
+    return true;
+  });
+}
+
+function render() {
+  const main = document.getElementById('main');
+  const bg   = board?.background?.value || 'var(--bg)';
+
+  main.style.background = bg.includes('gradient') ?
+    `linear-gradient(180deg, ${bg.replace(/linear-gradient\(\d+deg,/,'').replace(')','')} 0%, var(--bg) 300px)` :
+    'var(--bg)';
+
+  main.innerHTML = `
+    <!-- Board header -->
+    <div class="board-header">
+      <a href="/pages/dashboard.html?ws=${WS_ID}" class="btn btn-ghost btn-icon btn-sm">←</a>
+      <h2>${board?.name || 'Board'}</h2>
+      <span class="badge badge-gray">${lists.length} listas · ${cards.length} cartões</span>
+      <div class="board-header-actions">
+        <div class="dropdown">
+          <button class="btn btn-ghost btn-sm" data-dropdown="member-filter">
+            👤 ${activeFilters.member ? 'Filtrado' : 'Membro'}
+          </button>
+          <div class="dropdown-menu" id="member-filter">
+            <div class="dropdown-item" onclick="setFilter('member',null)">Todos</div>
+            ${members.map(m => `
+              <div class="dropdown-item" onclick="setFilter('member','${m.user_id}')">
+                ${avatarHtml(m.profiles?.full_name, null, 'avatar-sm')}
+                ${m.profiles?.full_name}
+              </div>`).join('')}
+          </div>
+        </div>
+        <div class="dropdown">
+          <button class="btn btn-ghost btn-sm" data-dropdown="label-filter">🏷 Etiqueta</button>
+          <div class="dropdown-menu" id="label-filter">
+            <div class="dropdown-item" onclick="setFilter('label',null)">Todas</div>
+            ${labels.map(l => `
+              <div class="dropdown-item" onclick="setFilter('label','${l.id}')">
+                <span style="width:12px;height:12px;border-radius:3px;background:${l.color};display:inline-block"></span>
+                ${l.name}
+              </div>`).join('')}
+          </div>
+        </div>
+        <div class="dropdown">
+          <button class="btn btn-ghost btn-sm" data-dropdown="status-filter">📌 Status</button>
+          <div class="dropdown-menu" id="status-filter">
+            <div class="dropdown-item" onclick="setFilter('status',null)">Todos</div>
+            <div class="dropdown-item" onclick="setFilter('status','active')">Ativo</div>
+            <div class="dropdown-item" onclick="setFilter('status','completed')">Concluído</div>
+          </div>
+        </div>
+        <a href="/pages/reports.html?ws=${WS_ID}&board=${BOARD_ID}" class="btn btn-ghost btn-sm">📊 Relatório</a>
+      </div>
+    </div>
+
+    <!-- Kanban -->
+    <div class="kanban-area" id="kanban-area">
+      ${lists.map(l => renderList(l)).join('')}
+
+      <!-- Adicionar lista -->
+      <div class="add-list-col">
+        <button class="add-list-btn" onclick="showAddList()">＋ Adicionar lista</button>
+        <div class="add-list-form" id="add-list-form">
+          <input class="input w-full" id="new-list-name" placeholder="Nome da lista..."
+                 onkeydown="if(event.key==='Enter') saveList(); if(event.key==='Escape') hideAddList()">
+          <div class="add-card-form-actions" style="margin-top:8px">
+            <button class="btn btn-primary btn-sm" onclick="saveList()">Adicionar</button>
+            <button class="btn btn-ghost btn-sm" onclick="hideAddList()">✕</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  initDragDrop();
+}
+
+function renderList(l) {
+  const lCards = filteredCards(l.id);
+  return `
+    <div class="list-col" data-list-id="${l.id}">
+      <div class="list-header">
+        <span class="list-title" ondblclick="editListTitle('${l.id}', this)">${l.name}</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="list-count">${lCards.length}</span>
+          <div class="dropdown">
+            <button class="btn btn-ghost btn-icon btn-sm" data-dropdown="list-menu-${l.id}">⋯</button>
+            <div class="dropdown-menu" id="list-menu-${l.id}">
+              <div class="dropdown-item" onclick="archiveList('${l.id}')">🗄 Arquivar lista</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cards-container" id="cards-${l.id}"
+           ondragover="onDragOver(event)" ondrop="onDrop(event,'${l.id}')"
+           ondragleave="onDragLeave(event)">
+        ${lCards.map(c => renderCard(c)).join('')}
+      </div>
+
+      <div class="add-card-btn" id="add-btn-${l.id}" onclick="showAddCard('${l.id}')">
+        ＋ Adicionar cartão
+      </div>
+      <div class="add-card-form hidden" id="add-form-${l.id}">
+        <textarea id="new-card-${l.id}" placeholder="Título do cartão..."
+                  onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();saveCard('${l.id}')}
+                             if(event.key==='Escape') hideAddCard('${l.id}')"></textarea>
+        <div class="add-card-form-actions">
+          <button class="btn btn-primary btn-sm" onclick="saveCard('${l.id}')">Adicionar</button>
+          <button class="btn btn-ghost btn-sm" onclick="hideAddCard('${l.id}')">✕</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderCard(c) {
+  const isOverdue = c.status === 'active' && c.due_date && new Date(c.due_date) < new Date();
+  const labels = c.card_labels?.map(cl =>
+    `<div class="card-label-dot" style="background:${cl.labels?.color}" title="${cl.labels?.name}"></div>`
+  ).join('') || '';
+  const assignees = c.card_members?.slice(0,3).map(m =>
+    avatarHtml(m.profiles?.full_name, m.profiles?.avatar_url, 'avatar-sm')
+  ).join('') || '';
+
+  return `
+    <div class="card-item" draggable="true" data-card-id="${c.id}"
+         ondragstart="onDragStart(event,'${c.id}','${c.list_id}')"
+         ondragend="onDragEnd(event)"
+         onclick="openCard('${c.id}')">
+      ${c.cover_color ? `<div class="card-cover" style="background:${c.cover_color}"></div>` : ''}
+      ${labels ? `<div class="card-labels">${labels}</div>` : ''}
+      <div class="card-title">${c.title}</div>
+      <div class="card-footer">
+        ${c.status === 'completed' ? '<span class="card-meta" style="color:var(--green)">✓ Concluído</span>' : ''}
+        ${c.due_date ? `
+          <span class="card-meta ${isOverdue ? 'overdue' : ''}">
+            📅 ${fmtDate(c.due_date)}
+          </span>` : ''}
+        ${assignees ? `<div class="card-assignees">${assignees}</div>` : ''}
+      </div>
+    </div>`;
+}
+
+// ── DRAG & DROP ──────────────────────────────────────────────
+function initDragDrop() {}
+
+function onDragStart(e, cardId, listId) {
+  dragCard = cardId; dragSourceListId = listId;
+  e.target.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onDragEnd(e) { e.target.classList.remove('dragging'); }
+function onDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function onDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+
+async function onDrop(e, targetListId) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (!dragCard || targetListId === dragSourceListId) return;
+
+  const targetCards = filteredCards(targetListId);
+  const newPos = targetCards.length > 0 ? targetCards[targetCards.length-1].position + 1 : 1;
+
+  await db.from('cards').update({ list_id: targetListId, position: newPos }).eq('id', dragCard);
+
+  const card = cards.find(c => c.id === dragCard);
+  if (card) { card.list_id = targetListId; card.position = newPos; }
+  dragCard = null; dragSourceListId = null;
+  render();
+}
+
+// ── ADICIONAR CARTÃO ─────────────────────────────────────────
+function showAddCard(listId) {
+  document.getElementById(`add-btn-${listId}`).classList.add('hidden');
+  document.getElementById(`add-form-${listId}`).classList.remove('hidden');
+  document.getElementById(`new-card-${listId}`).focus();
+}
+function hideAddCard(listId) {
+  document.getElementById(`add-btn-${listId}`).classList.remove('hidden');
+  document.getElementById(`add-form-${listId}`).classList.add('hidden');
+  document.getElementById(`new-card-${listId}`).value = '';
+}
+
+async function saveCard(listId) {
+  const title = document.getElementById(`new-card-${listId}`).value.trim();
+  if (!title) return;
+
+  const listCards = filteredCards(listId);
+  const pos = listCards.length > 0 ? listCards[listCards.length-1].position + 1 : 1;
+
+  const { data, error } = await db.from('cards').insert({
+    list_id: listId, title, position: pos, created_by: App.user.id
+  }).select(`
+    id, title, status, position, due_date, cover_color, list_id, is_archived,
+    card_members(user_id, profiles(full_name, avatar_url)),
+    card_labels(label_id, labels(name, color))
+  `).single();
+
+  if (error) { toast(error.message, 'error'); return; }
+  cards.push(data);
+  hideAddCard(listId);
+  render();
+  toast('Cartão criado!', 'success');
+}
+
+// ── ADICIONAR LISTA ──────────────────────────────────────────
+function showAddList()  { document.getElementById('add-list-form').style.display='block'; document.getElementById('new-list-name').focus(); }
+function hideAddList()  { document.getElementById('add-list-form').style.display='none'; document.getElementById('new-list-name').value=''; }
+
+async function saveList() {
+  const name = document.getElementById('new-list-name').value.trim();
+  if (!name) return;
+  const pos = lists.length > 0 ? lists[lists.length-1].position + 1 : 1;
+  const { data, error } = await db.from('lists').insert({ board_id: BOARD_ID, name, position: pos }).select().single();
+  if (error) { toast(error.message, 'error'); return; }
+  lists.push(data); hideAddList(); render();
+}
+
+// ── EDITAR TÍTULO DA LISTA ───────────────────────────────────
+function editListTitle(listId, el) {
+  const input = document.createElement('input');
+  input.className = 'list-title-input';
+  input.value = el.textContent;
+  el.replaceWith(input);
+  input.focus(); input.select();
+  async function save() {
+    const name = input.value.trim();
+    if (name && name !== el.textContent) {
+      await db.from('lists').update({ name }).eq('id', listId);
+      const l = lists.find(l => l.id === listId);
+      if (l) l.name = name;
+    }
+    render();
+  }
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') render(); });
+}
+
+async function archiveList(listId) {
+  if (!confirm('Arquivar esta lista?')) return;
+  await db.from('lists').update({ is_archived: true }).eq('id', listId);
+  lists = lists.filter(l => l.id !== listId);
+  render();
+}
+
+// ── ABRIR CARTÃO ─────────────────────────────────────────────
+function openCard(cardId) {
+  window.location.href = `/pages/card.html?card=${cardId}&board=${BOARD_ID}&ws=${WS_ID}`;
+}
+
+// ── FILTROS ──────────────────────────────────────────────────
+function setFilter(type, value) {
+  activeFilters[type] = value;
+  render();
+}
+
+init();
+</script>
+</body>
+</html>

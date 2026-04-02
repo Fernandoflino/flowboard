@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlowBoard — Dashboard</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .boards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+      margin-top: 24px;
+    }
+    .board-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); overflow: hidden;
+      cursor: pointer; transition: all .2s;
+      text-decoration: none; color: inherit;
+      display: flex; flex-direction: column;
+    }
+    .board-card:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 8px 32px rgba(79,124,255,.15); }
+    .board-cover {
+      height: 80px;
+      background: linear-gradient(135deg, var(--accent-dim), var(--accent));
+    }
+    .board-info { padding: 14px 16px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+    .board-name { font-family: var(--font-display); font-weight: 700; font-size: .95rem; }
+    .board-meta { display: flex; align-items: center; gap: 8px; margin-top: auto; }
+    .board-add {
+      border: 2px dashed var(--border2); background: transparent;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 8px; padding: 32px 16px;
+      color: var(--text3); font-size: .875rem; border-radius: var(--radius-lg);
+      cursor: pointer; transition: all .2s;
+    }
+    .board-add:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+    .board-add .icon { font-size: 1.6rem; }
+
+    /* STATS */
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 8px; }
+    .stat-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 18px 20px;
+    }
+    .stat-value { font-family: var(--font-display); font-size: 1.9rem; font-weight: 800; line-height: 1; }
+    .stat-label { font-size: .78rem; color: var(--text2); margin-top: 4px; }
+    .stat-delta { font-size: .75rem; color: var(--green); margin-top: 8px; }
+
+    /* SIDEBAR LINKS */
+    .page-sidebar {
+      background: var(--bg2); border-right: 1px solid var(--border);
+      padding: 16px 12px; overflow-y: auto;
+    }
+
+    @media (max-width: 768px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <!-- TOPBAR -->
+  <header class="topbar" id="topbar"></header>
+
+  <!-- SIDEBAR -->
+  <nav class="page-sidebar" id="sidebar"></nav>
+
+  <!-- CONTEÚDO -->
+  <main class="main-content" id="main">
+    <div class="loading-screen"><div class="spinner"></div></div>
+  </main>
+</div>
+
+<!-- MODAL NOVO WORKSPACE -->
+<div class="modal-overlay" id="modal-new-workspace">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Novo workspace</h3>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-new-workspace')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="input-group">
+        <label>Nome</label>
+        <input class="input" id="ws-name" placeholder="Ex: Marketing, Dev, RH...">
+      </div>
+      <div class="input-group">
+        <label>Descrição (opcional)</label>
+        <textarea class="input" id="ws-desc" rows="2" placeholder="Para que serve este workspace?"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-new-workspace')">Cancelar</button>
+      <button class="btn btn-primary" onclick="createWorkspace()">Criar workspace</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NOVO BOARD -->
+<div class="modal-overlay" id="modal-new-board">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Novo board</h3>
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="closeModal('modal-new-board')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="input-group">
+        <label>Nome do board</label>
+        <input class="input" id="board-name" placeholder="Ex: Sprint 1, Roadmap, Suporte...">
+      </div>
+      <div class="input-group">
+        <label>Visibilidade</label>
+        <select class="input" id="board-visibility">
+          <option value="workspace">Workspace (todos os membros)</option>
+          <option value="private">Privado (apenas convidados)</option>
+          <option value="public">Público</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label>Cor do banner</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap" id="color-picker">
+          <div class="color-opt selected" data-color="linear-gradient(135deg,#2a4299,#4f7cff)" style="background:linear-gradient(135deg,#2a4299,#4f7cff)"></div>
+          <div class="color-opt" data-color="linear-gradient(135deg,#065f46,#10b981)" style="background:linear-gradient(135deg,#065f46,#10b981)"></div>
+          <div class="color-opt" data-color="linear-gradient(135deg,#7c3aed,#a855f7)" style="background:linear-gradient(135deg,#7c3aed,#a855f7)"></div>
+          <div class="color-opt" data-color="linear-gradient(135deg,#92400e,#f59e0b)" style="background:linear-gradient(135deg,#92400e,#f59e0b)"></div>
+          <div class="color-opt" data-color="linear-gradient(135deg,#9f1239,#ef4444)" style="background:linear-gradient(135deg,#9f1239,#ef4444)"></div>
+          <div class="color-opt" data-color="linear-gradient(135deg,#164e63,#06b6d4)" style="background:linear-gradient(135deg,#164e63,#06b6d4)"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-new-board')">Cancelar</button>
+      <button class="btn btn-primary" onclick="createBoard()">Criar board</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/supabase.js"></script>
+<script>
+  let selectedColor = 'linear-gradient(135deg,#2a4299,#4f7cff)';
+  let currentWorkspaceId = null;
+
+  // Seletor de cor
+  document.querySelectorAll('.color-opt').forEach(opt => {
+    opt.style.cssText += ';width:32px;height:32px;border-radius:6px;cursor:pointer;border:2px solid transparent;';
+    opt.addEventListener('click', () => {
+      document.querySelectorAll('.color-opt').forEach(o => o.style.border = '2px solid transparent');
+      opt.style.border = '2px solid #fff';
+      selectedColor = opt.dataset.color;
+    });
+  });
+  document.querySelector('.color-opt.selected').style.border = '2px solid #fff';
+
+  async function init() {
+    const params = new URLSearchParams(location.search);
+    const wsId   = params.get('ws') || localStorage.getItem('activeWorkspace');
+    await initTopbar(wsId);
+    currentWorkspaceId = App.workspace?.id;
+    if (!currentWorkspaceId) { renderNoWorkspace(); return; }
+    localStorage.setItem('activeWorkspace', currentWorkspaceId);
+    await renderSidebar();
+    await renderMain();
+  }
+
+  async function renderSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const { data: members } = await db
+      .from('workspace_members')
+      .select('user_id, role')
+      .eq('workspace_id', currentWorkspaceId);
+
+    sidebar.innerHTML = `
+      <div class="sidebar-section-title">Menu</div>
+      <a href="/pages/dashboard.html?ws=${currentWorkspaceId}" class="sidebar-item active">
+        <span class="icon">⊞</span> Boards
+      </a>
+      <a href="/pages/reports.html?ws=${currentWorkspaceId}" class="sidebar-item">
+        <span class="icon">📊</span> Relatórios
+      </a>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Workspace</div>
+        <a href="/pages/members.html?ws=${currentWorkspaceId}" class="sidebar-item">
+          <span class="icon">👥</span> Membros
+          <span class="badge-count">${members?.length || 0}</span>
+        </a>
+        <a href="/pages/settings.html?ws=${currentWorkspaceId}" class="sidebar-item">
+          <span class="icon">⚙</span> Configurações
+        </a>
+      </div>
+    `;
+  }
+
+  async function renderMain() {
+    const main = document.getElementById('main');
+
+    // Busca boards e stats em paralelo
+    const [{ data: boards }, { data: stats }] = await Promise.all([
+      db.from('boards')
+        .select('id, name, visibility, background, created_at')
+        .eq('workspace_id', currentWorkspaceId)
+        .eq('is_archived', false)
+        .order('created_at'),
+      db.from('v_cards_full')
+        .select('card_status, is_overdue')
+        .eq('workspace_id', currentWorkspaceId)
+    ]);
+
+    const total     = stats?.length || 0;
+    const done      = stats?.filter(c => c.card_status === 'completed').length || 0;
+    const overdue   = stats?.filter(c => c.is_overdue).length || 0;
+    const active    = stats?.filter(c => c.card_status === 'active' && !c.is_overdue).length || 0;
+
+    const params = new URLSearchParams(location.search);
+    const search = params.get('search')?.toLowerCase() || '';
+    const filtered = search ? boards?.filter(b => b.name.toLowerCase().includes(search)) : boards;
+
+    main.innerHTML = `
+      <div class="flex-between">
+        <div>
+          <h1 style="font-size:1.4rem">🏢 ${App.workspace?.name}</h1>
+          <p class="text-muted text-sm mt-2">Seus boards de trabalho</p>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('modal-new-board')">＋ Novo board</button>
+      </div>
+
+      <div class="stats-row" style="margin-top:24px">
+        <div class="stat-card">
+          <div class="stat-value">${total}</div>
+          <div class="stat-label">Total de cartões</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color:var(--green)">${done}</div>
+          <div class="stat-label">Concluídos</div>
+          <div class="stat-delta">↑ ${total ? Math.round(done/total*100) : 0}% taxa de conclusão</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color:var(--accent)">${active}</div>
+          <div class="stat-label">Em andamento</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color:var(--red)">${overdue}</div>
+          <div class="stat-label">Atrasados</div>
+        </div>
+      </div>
+
+      ${search ? `<p class="text-muted text-sm" style="margin-top:16px">Resultados para "<strong>${search}</strong>"</p>` : ''}
+
+      <div class="boards-grid">
+        ${filtered?.map(b => boardCard(b)).join('') || ''}
+        <div class="board-add" onclick="openModal('modal-new-board')">
+          <span class="icon">＋</span>
+          <span>Criar novo board</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function boardCard(b) {
+    const bg = b.background?.value || 'linear-gradient(135deg,#2a4299,#4f7cff)';
+    const vis = { workspace: '🌐', private: '🔒', public: '🌍' }[b.visibility] || '';
+    return `
+      <a class="board-card" href="/pages/kanban.html?board=${b.id}&ws=${currentWorkspaceId}">
+        <div class="board-cover" style="background:${bg}"></div>
+        <div class="board-info">
+          <div class="board-name">${b.name}</div>
+          <div class="board-meta">
+            <span class="text-sm text-muted">${vis} ${b.visibility}</span>
+          </div>
+        </div>
+      </a>`;
+  }
+
+  function renderNoWorkspace() {
+    document.getElementById('main').innerHTML = `
+      <div class="empty-state">
+        <div class="icon">🏢</div>
+        <h2>Nenhum workspace encontrado</h2>
+        <p>Crie seu primeiro workspace para começar.</p>
+        <button class="btn btn-primary mt-4" onclick="openModal('modal-new-workspace')">Criar workspace</button>
+      </div>`;
+  }
+
+  async function createWorkspace() {
+    const name = document.getElementById('ws-name').value.trim();
+    const desc = document.getElementById('ws-desc').value.trim();
+    if (!name) { toast('Digite um nome', 'error'); return; }
+
+    const { data, error } = await db.from('workspaces').insert({
+      name, description: desc || null, owner_id: App.user.id
+    }).select().single();
+
+    if (error) { toast(error.message, 'error'); return; }
+    toast('Workspace criado!', 'success');
+    closeModal('modal-new-workspace');
+    switchWorkspace(data.id);
+  }
+
+  async function createBoard() {
+    const name = document.getElementById('board-name').value.trim();
+    const vis  = document.getElementById('board-visibility').value;
+    if (!name) { toast('Digite um nome para o board', 'error'); return; }
+
+    const { data, error } = await db.from('boards').insert({
+      name, visibility: vis,
+      workspace_id: currentWorkspaceId,
+      created_by: App.user.id,
+      background: { type: 'gradient', value: selectedColor }
+    }).select().single();
+
+    if (error) { toast(error.message, 'error'); return; }
+
+    // Criar listas padrão
+    await db.from('lists').insert([
+      { board_id: data.id, name: 'A fazer',      position: 1 },
+      { board_id: data.id, name: 'Em progresso', position: 2 },
+      { board_id: data.id, name: 'Concluído',    position: 3 },
+    ]);
+
+    toast('Board criado!', 'success');
+    closeModal('modal-new-board');
+    window.location.href = `/pages/kanban.html?board=${data.id}&ws=${currentWorkspaceId}`;
+  }
+
+  init();
+</script>
+</body>
+</html>

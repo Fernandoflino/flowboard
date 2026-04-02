@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlowBoard — Cartão</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .card-page { display: grid; grid-template-columns: 1fr 300px; gap: 0; flex: 1; overflow: hidden; }
+    .card-main  { padding: 28px; overflow-y: auto; }
+    .card-aside { background: var(--bg2); border-left: 1px solid var(--border); padding: 20px; overflow-y: auto; }
+
+    .card-cover-strip { height: 8px; width: 100%; border-radius: 4px; margin-bottom: 20px; }
+
+    .card-title-edit {
+      font-family: var(--font-display); font-size: 1.4rem; font-weight: 700;
+      background: transparent; border: none; color: var(--text); width: 100%;
+      padding: 4px 0; border-bottom: 2px solid transparent; transition: border-color .2s;
+      resize: none; overflow: hidden;
+    }
+    .card-title-edit:focus { outline: none; border-bottom-color: var(--accent); }
+
+    .card-meta-row {
+      display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; margin-bottom: 24px;
+      padding-bottom: 16px; border-bottom: 1px solid var(--border);
+    }
+    .meta-item { display: flex; align-items: center; gap: 6px; font-size: .82rem; color: var(--text2); }
+
+    /* Descrição */
+    .section-title { font-size: .75rem; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 8px; margin-top: 20px; }
+    .desc-area { width: 100%; min-height: 80px; padding: 10px 12px; font-size: .9rem; resize: vertical; border-radius: var(--radius); }
+
+    /* Checklist */
+    .checklist-block { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 12px; overflow: hidden; }
+    .checklist-header { display: flex; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); gap: 8px; }
+    .checklist-title { font-weight: 600; font-size: .875rem; flex: 1; }
+    .progress-bar { height: 4px; background: var(--bg4); border-radius: 2px; margin: 0 14px 8px; }
+    .progress-fill { height: 100%; background: var(--green); border-radius: 2px; transition: width .3s; }
+    .check-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 14px; transition: background .15s; }
+    .check-item:hover { background: var(--bg4); }
+    .check-item input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; cursor: pointer; }
+    .check-item label { font-size: .875rem; flex: 1; cursor: pointer; }
+    .check-item label.done { text-decoration: line-through; color: var(--text3); }
+    .add-check-item { padding: 8px 14px 12px; }
+    .add-check-item input { font-size: .85rem; padding: 6px 10px; }
+
+    /* Comentários */
+    .comment-block { display: flex; gap: 10px; margin-bottom: 16px; }
+    .comment-body { flex: 1; }
+    .comment-content { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-size: .875rem; line-height: 1.6; }
+    .comment-actions { display: flex; gap: 12px; margin-top: 4px; }
+    .comment-action { font-size: .75rem; color: var(--text3); cursor: pointer; }
+    .comment-action:hover { color: var(--accent); }
+
+    /* Aside */
+    .aside-section { margin-bottom: 20px; }
+    .aside-title { font-size: .72rem; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 8px; }
+    .member-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: .85rem; }
+    .label-item { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+    .label-dot { width: 24px; height: 24px; border-radius: 4px; flex-shrink: 0; }
+    .label-name { font-size: .85rem; }
+
+    /* Anexos */
+    .attach-item { display: flex; align-items: center; gap: 10px; padding: 8px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; }
+    .attach-icon { font-size: 1.2rem; flex-shrink: 0; }
+    .attach-name { font-size: .85rem; font-weight: 500; truncate: true; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .attach-img { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; }
+
+    @media (max-width: 900px) {
+      .card-page { grid-template-columns: 1fr; }
+      .card-aside { border-left: none; border-top: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar" id="topbar"></header>
+  <nav style="display:none"></nav>
+  <main class="main-content" id="main" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
+    <div class="loading-screen"><div class="spinner"></div></div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/supabase.js"></script>
+<script>
+const params   = new URLSearchParams(location.search);
+const CARD_ID  = params.get('card');
+const BOARD_ID = params.get('board');
+const WS_ID    = params.get('ws');
+
+let card = null, checklists = [], comments = [], attachments = [], allMembers = [], allLabels = [];
+
+async function init() {
+  await initTopbar(WS_ID);
+  await loadAll();
+  render();
+}
+
+async function loadAll() {
+  const [
+    { data: c }, { data: chks }, { data: cms },
+    { data: ats }, { data: ms }, { data: lbs }
+  ] = await Promise.all([
+    db.from('cards').select(`
+      *, list_id, lists(name, board_id, boards(name)),
+      card_members(user_id, profiles(full_name, avatar_url)),
+      card_labels(label_id, labels(name, color)),
+      custom_field_values(*, custom_fields(name, field_type))
+    `).eq('id', CARD_ID).single(),
+    db.from('checklists').select(`*, checklist_items(*)`)
+      .eq('card_id', CARD_ID).order('position'),
+    db.from('card_comments').select(`*, profiles(full_name, avatar_url)`)
+      .eq('card_id', CARD_ID).order('created_at'),
+    db.from('card_attachments').select('*').eq('card_id', CARD_ID).order('created_at'),
+    db.from('workspace_members').select('user_id, profiles(full_name, avatar_url)').eq('workspace_id', WS_ID),
+    db.from('labels').select('*').eq('board_id', BOARD_ID),
+  ]);
+  card = c; checklists = chks || []; comments = cms || [];
+  attachments = ats || []; allMembers = ms || []; allLabels = lbs || [];
+}
+
+function render() {
+  const main = document.getElementById('main');
+
+  // Breadcrumb
+  const boardName = card?.lists?.boards?.name || 'Board';
+  const listName  = card?.lists?.name || 'Lista';
+
+  main.innerHTML = `
+    <div style="padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <a href="/pages/kanban.html?board=${BOARD_ID}&ws=${WS_ID}" class="btn btn-ghost btn-sm">← ${boardName}</a>
+      <span class="text-muted">/</span>
+      <span class="text-sm text-muted">${listName}</span>
+    </div>
+
+    <div class="card-page">
+      <!-- MAIN -->
+      <div class="card-main">
+        ${card?.cover_color ? `<div class="card-cover-strip" style="background:${card.cover_color}"></div>` : ''}
+
+        <textarea class="card-title-edit" id="card-title" rows="1"
+          onblur="saveTitle()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"
+          oninput="autoResize(this)">${card?.title || ''}</textarea>
+
+        <div class="card-meta-row">
+          ${statusBadge(card?.status)}
+          ${card?.due_date ? `
+            <span class="meta-item">
+              📅 <span>${fmtDate(card.due_date)}</span>
+            </span>` : ''}
+          ${card?.completed_at ? `<span class="meta-item">✓ Concluído em ${fmtDate(card.completed_at)}</span>` : ''}
+          <span class="meta-item">📋 Criado ${fmtDate(card?.created_at)}</span>
+        </div>
+
+        <!-- Descrição -->
+        <div class="section-title">📝 Descrição</div>
+        <textarea class="input desc-area" id="card-desc" placeholder="Adicione uma descrição detalhada..."
+          onblur="saveDesc()">${card?.description || ''}</textarea>
+
+        <!-- Checklists -->
+        ${checklists.map(cl => renderChecklist(cl)).join('')}
+        <button class="btn btn-ghost btn-sm mt-4" onclick="addChecklist()">☑ Adicionar checklist</button>
+
+        <!-- Atividade / Comentários -->
+        <div class="section-title" style="margin-top:28px">💬 Comentários (${comments.length})</div>
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          ${avatarHtml(App.profile?.full_name, App.profile?.avatar_url)}
+          <div style="flex:1">
+            <textarea class="input w-full" id="new-comment" rows="2"
+              placeholder="Escreva um comentário..."
+              style="resize:none;font-size:.875rem;padding:8px 12px"></textarea>
+            <div style="margin-top:6px">
+              <button class="btn btn-primary btn-sm" onclick="postComment()">Comentar</button>
+            </div>
+          </div>
+        </div>
+        ${comments.map(c => renderComment(c)).join('')}
+
+        <!-- Anexos -->
+        ${attachments.length > 0 ? `
+          <div class="section-title" style="margin-top:24px">📎 Anexos (${attachments.length})</div>
+          ${attachments.map(a => renderAttachment(a)).join('')}
+        ` : ''}
+      </div>
+
+      <!-- ASIDE -->
+      <div class="card-aside">
+        <!-- STATUS -->
+        <div class="aside-section">
+          <div class="aside-title">Status</div>
+          <select class="input w-full" onchange="updateStatus(this.value)">
+            <option value="active"    ${card?.status==='active'    ?'selected':''}>Ativo</option>
+            <option value="completed" ${card?.status==='completed' ?'selected':''}>Concluído</option>
+            <option value="archived"  ${card?.status==='archived'  ?'selected':''}>Arquivado</option>
+          </select>
+        </div>
+
+        <!-- DATAS -->
+        <div class="aside-section">
+          <div class="aside-title">Datas</div>
+          <div class="input-group">
+            <label>Início</label>
+            <input type="date" class="input" id="start-date" value="${card?.start_date?.slice(0,10)||''}" onchange="updateDates()">
+          </div>
+          <div class="input-group" style="margin-top:8px">
+            <label>Entrega</label>
+            <input type="date" class="input" id="due-date" value="${card?.due_date?.slice(0,10)||''}" onchange="updateDates()">
+          </div>
+        </div>
+
+        <!-- RESPONSÁVEIS -->
+        <div class="aside-section">
+          <div class="aside-title">Responsáveis</div>
+          ${card?.card_members?.map(m => `
+            <div class="member-item">
+              ${avatarHtml(m.profiles?.full_name, m.profiles?.avatar_url, 'avatar-sm')}
+              <span>${m.profiles?.full_name}</span>
+              <button class="btn btn-ghost btn-icon btn-sm" style="margin-left:auto"
+                onclick="removeMember('${m.user_id}')">✕</button>
+            </div>`).join('') || '<p class="text-sm text-muted">Nenhum responsável</p>'}
+          <div class="dropdown" style="margin-top:8px">
+            <button class="btn btn-ghost btn-sm w-full" data-dropdown="add-member-dd">＋ Adicionar</button>
+            <div class="dropdown-menu" id="add-member-dd" style="width:100%">
+              ${allMembers.filter(m => !card?.card_members?.some(cm => cm.user_id === m.user_id)).map(m => `
+                <div class="dropdown-item" onclick="addMember('${m.user_id}')">
+                  ${avatarHtml(m.profiles?.full_name, null, 'avatar-sm')}
+                  ${m.profiles?.full_name}
+                </div>`).join('') || '<div class="dropdown-item text-muted">Nenhum disponível</div>'}
+            </div>
+          </div>
+        </div>
+
+        <!-- ETIQUETAS -->
+        <div class="aside-section">
+          <div class="aside-title">Etiquetas</div>
+          ${card?.card_labels?.map(cl => `
+            <div class="label-item">
+              <div class="label-dot" style="background:${cl.labels?.color}"></div>
+              <span class="label-name">${cl.labels?.name}</span>
+              <button class="btn btn-ghost btn-icon btn-sm" style="margin-left:auto"
+                onclick="removeLabel('${cl.label_id}')">✕</button>
+            </div>`).join('') || '<p class="text-sm text-muted">Nenhuma etiqueta</p>'}
+          <div class="dropdown" style="margin-top:8px">
+            <button class="btn btn-ghost btn-sm w-full" data-dropdown="add-label-dd">＋ Adicionar</button>
+            <div class="dropdown-menu" id="add-label-dd" style="width:100%">
+              ${allLabels.filter(l => !card?.card_labels?.some(cl => cl.label_id === l.id)).map(l => `
+                <div class="dropdown-item" onclick="addLabel('${l.id}')">
+                  <span style="width:14px;height:14px;border-radius:3px;background:${l.color};display:inline-block;flex-shrink:0"></span>
+                  ${l.name}
+                </div>`).join('') || '<div class="dropdown-item text-muted">Nenhuma disponível</div>'}
+            </div>
+          </div>
+        </div>
+
+        <!-- CAMPOS PERSONALIZADOS -->
+        ${card?.custom_field_values?.length ? `
+          <div class="aside-section">
+            <div class="aside-title">Campos personalizados</div>
+            ${card.custom_field_values.map(cfv => `
+              <div style="margin-bottom:10px">
+                <div class="text-sm text-muted" style="margin-bottom:3px">${cfv.custom_fields?.name}</div>
+                <div style="font-size:.875rem">${cfv.value_text || cfv.value_number || cfv.value_list || (cfv.value_boolean !== null ? (cfv.value_boolean ? 'Sim' : 'Não') : '') || (cfv.value_date ? fmtDate(cfv.value_date) : '—')}</div>
+              </div>`).join('')}
+          </div>` : ''}
+
+        <!-- AÇÕES -->
+        <div class="aside-section">
+          <div class="aside-title">Ações</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label class="btn btn-ghost btn-sm" style="cursor:pointer;justify-content:flex-start;gap:8px">
+              📎 Anexar arquivo
+              <input type="file" style="display:none" onchange="uploadAttachment(this)">
+            </label>
+            <button class="btn btn-ghost btn-sm" style="justify-content:flex-start;gap:8px"
+              onclick="pickCover()">🎨 Cor de capa</button>
+            <button class="btn btn-danger btn-sm" style="justify-content:flex-start;gap:8px;margin-top:8px"
+              onclick="archiveCard()">🗄 Arquivar cartão</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Auto-resize do título
+  const titleEl = document.getElementById('card-title');
+  if (titleEl) autoResize(titleEl);
+}
+
+function autoResize(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+
+// ── SALVAR ───────────────────────────────────────────────────
+async function saveTitle() {
+  const title = document.getElementById('card-title').value.trim();
+  if (!title || title === card.title) return;
+  await db.from('cards').update({ title }).eq('id', CARD_ID);
+  card.title = title;
+  toast('Título atualizado', 'success');
+}
+
+async function saveDesc() {
+  const desc = document.getElementById('card-desc').value.trim() || null;
+  if (desc === card.description) return;
+  await db.from('cards').update({ description: desc }).eq('id', CARD_ID);
+  card.description = desc;
+}
+
+async function updateStatus(status) {
+  await db.from('cards').update({ status }).eq('id', CARD_ID);
+  card.status = status;
+  toast('Status atualizado', 'success');
+  render();
+}
+
+async function updateDates() {
+  const sd = document.getElementById('start-date').value || null;
+  const dd = document.getElementById('due-date').value || null;
+  await db.from('cards').update({ start_date: sd, due_date: dd }).eq('id', CARD_ID);
+  card.start_date = sd; card.due_date = dd;
+}
+
+// ── MEMBROS ──────────────────────────────────────────────────
+async function addMember(userId) {
+  const { error } = await db.from('card_members').insert({ card_id: CARD_ID, user_id: userId, added_by: App.user.id });
+  if (error) { toast(error.message,'error'); return; }
+  await loadAll(); render();
+}
+async function removeMember(userId) {
+  await db.from('card_members').delete().eq('card_id', CARD_ID).eq('user_id', userId);
+  await loadAll(); render();
+}
+
+// ── ETIQUETAS ────────────────────────────────────────────────
+async function addLabel(labelId) {
+  await db.from('card_labels').insert({ card_id: CARD_ID, label_id: labelId });
+  await loadAll(); render();
+}
+async function removeLabel(labelId) {
+  await db.from('card_labels').delete().eq('card_id', CARD_ID).eq('label_id', labelId);
+  await loadAll(); render();
+}
+
+// ── CHECKLISTS ───────────────────────────────────────────────
+function renderChecklist(cl) {
+  const items = cl.checklist_items || [];
+  const done  = items.filter(i => i.is_done).length;
+  const pct   = items.length ? Math.round(done/items.length*100) : 0;
+  return `
+    <div class="checklist-block" style="margin-top:16px">
+      <div class="checklist-header">
+        <span>☑</span>
+        <span class="checklist-title">${cl.title}</span>
+        <span class="text-sm text-muted">${done}/${items.length}</span>
+        <button class="btn btn-ghost btn-icon btn-sm" onclick="deleteChecklist('${cl.id}')">✕</button>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      ${items.map(i => `
+        <div class="check-item">
+          <input type="checkbox" id="ci-${i.id}" ${i.is_done ? 'checked' : ''}
+            onchange="toggleItem('${i.id}', this.checked)">
+          <label for="ci-${i.id}" class="${i.is_done ? 'done' : ''}">${i.title}</label>
+          <button class="btn btn-ghost btn-icon btn-sm" style="opacity:.4" onclick="deleteItem('${i.id}','${cl.id}')">✕</button>
+        </div>`).join('')}
+      <div class="add-check-item">
+        <input class="input w-full" id="new-item-${cl.id}" placeholder="Adicionar item..."
+               onkeydown="if(event.key==='Enter') addItem('${cl.id}')">
+      </div>
+    </div>`;
+}
+
+async function addChecklist() {
+  const name = prompt('Nome do checklist:', 'Checklist');
+  if (!name) return;
+  const pos = checklists.length > 0 ? checklists[checklists.length-1].position + 1 : 1;
+  const { data } = await db.from('checklists').insert({ card_id: CARD_ID, title: name, position: pos }).select('*, checklist_items(*)').single();
+  checklists.push(data); render();
+}
+
+async function deleteChecklist(id) {
+  if (!confirm('Excluir este checklist?')) return;
+  await db.from('checklists').delete().eq('id', id);
+  checklists = checklists.filter(c => c.id !== id); render();
+}
+
+async function addItem(checklistId) {
+  const title = document.getElementById(`new-item-${checklistId}`).value.trim();
+  if (!title) return;
+  const cl = checklists.find(c => c.id === checklistId);
+  const pos = cl?.checklist_items?.length + 1 || 1;
+  const { data } = await db.from('checklist_items').insert({ checklist_id: checklistId, title, position: pos }).select().single();
+  cl.checklist_items = [...(cl.checklist_items || []), data]; render();
+}
+
+async function toggleItem(itemId, isDone) {
+  await db.from('checklist_items').update({ is_done: isDone }).eq('id', itemId);
+  for (const cl of checklists) {
+    const item = cl.checklist_items?.find(i => i.id === itemId);
+    if (item) { item.is_done = isDone; break; }
+  }
+  render();
+}
+
+async function deleteItem(itemId, checklistId) {
+  await db.from('checklist_items').delete().eq('id', itemId);
+  const cl = checklists.find(c => c.id === checklistId);
+  if (cl) cl.checklist_items = cl.checklist_items.filter(i => i.id !== itemId);
+  render();
+}
+
+// ── COMENTÁRIOS ──────────────────────────────────────────────
+function renderComment(c) {
+  const isOwn = c.user_id === App.user?.id;
+  return `
+    <div class="comment-block">
+      ${avatarHtml(c.profiles?.full_name, c.profiles?.avatar_url)}
+      <div class="comment-body">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+          <strong style="font-size:.85rem">${c.profiles?.full_name}</strong>
+          <span class="text-sm text-muted">${timeAgo(c.created_at)}</span>
+          ${c.is_edited ? '<span class="text-sm text-muted">(editado)</span>' : ''}
+        </div>
+        <div class="comment-content" id="comment-content-${c.id}">${c.content}</div>
+        ${isOwn ? `
+          <div class="comment-actions">
+            <span class="comment-action" onclick="editComment('${c.id}','${c.content.replace(/'/g,"\\'")}')">Editar</span>
+            <span class="comment-action" onclick="deleteComment('${c.id}')">Excluir</span>
+          </div>` : ''}
+      </div>
+    </div>`;
+}
+
+async function postComment() {
+  const content = document.getElementById('new-comment').value.trim();
+  if (!content) return;
+  const { data, error } = await db.from('card_comments')
+    .insert({ card_id: CARD_ID, user_id: App.user.id, content })
+    .select('*, profiles(full_name, avatar_url)').single();
+  if (error) { toast(error.message,'error'); return; }
+  comments.push(data);
+  document.getElementById('new-comment').value = '';
+  render(); toast('Comentário adicionado', 'success');
+}
+
+async function deleteComment(id) {
+  if (!confirm('Excluir comentário?')) return;
+  await db.from('card_comments').delete().eq('id', id);
+  comments = comments.filter(c => c.id !== id); render();
+}
+
+function editComment(id, currentContent) {
+  const el = document.getElementById(`comment-content-${id}`);
+  el.innerHTML = `
+    <textarea class="input w-full" id="edit-comment-${id}" rows="2" style="resize:none;font-size:.875rem">${currentContent}</textarea>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <button class="btn btn-primary btn-sm" onclick="saveComment('${id}')">Salvar</button>
+      <button class="btn btn-ghost btn-sm" onclick="render()">Cancelar</button>
+    </div>`;
+}
+
+async function saveComment(id) {
+  const content = document.getElementById(`edit-comment-${id}`).value.trim();
+  if (!content) return;
+  await db.from('card_comments').update({ content, is_edited: true }).eq('id', id);
+  const c = comments.find(c => c.id === id);
+  if (c) { c.content = content; c.is_edited = true; }
+  render();
+}
+
+// ── ANEXO ────────────────────────────────────────────────────
+function renderAttachment(a) {
+  return `
+    <div class="attach-item">
+      ${a.is_image ? `<img class="attach-img" src="${a.url}" alt="${a.name}">` : `<span class="attach-icon">📎</span>`}
+      <div style="flex:1;overflow:hidden">
+        <div class="attach-name">${a.name}</div>
+        <div class="text-sm text-muted">${a.mime_type || ''}</div>
+      </div>
+      <a href="${a.url}" target="_blank" class="btn btn-ghost btn-sm">↗</a>
+    </div>`;
+}
+
+async function uploadAttachment(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const path = `${WS_ID}/${CARD_ID}/${Date.now()}-${file.name}`;
+  const { data: storageData, error: storageError } = await db.storage.from('attachments').upload(path, file);
+  if (storageError) { toast('Erro no upload: ' + storageError.message, 'error'); return; }
+  const { data: urlData } = db.storage.from('attachments').getPublicUrl(path);
+  const { error } = await db.from('card_attachments').insert({
+    card_id: CARD_ID, uploaded_by: App.user.id,
+    name: file.name, url: urlData.publicUrl,
+    storage_path: path, mime_type: file.type,
+    size_bytes: file.size,
+    is_image: file.type.startsWith('image/')
+  });
+  if (error) { toast(error.message,'error'); return; }
+  await loadAll(); render(); toast('Arquivo anexado!', 'success');
+}
+
+async function archiveCard() {
+  if (!confirm('Arquivar este cartão?')) return;
+  await db.from('cards').update({ is_archived: true }).eq('id', CARD_ID);
+  toast('Cartão arquivado', 'success');
+  setTimeout(() => window.location.href = `/pages/kanban.html?board=${BOARD_ID}&ws=${WS_ID}`, 1000);
+}
+
+async function pickCover() {
+  const color = prompt('Digite uma cor hex (ex: #ef4444) ou deixe vazio para remover:');
+  await db.from('cards').update({ cover_color: color || null }).eq('id', CARD_ID);
+  card.cover_color = color || null;
+  render();
+}
+
+init();
+</script>
+</body>
+</html>
