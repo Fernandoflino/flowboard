@@ -16,7 +16,8 @@ meu-trello/
 │       ├── 005_activity_notifications_automations.sql
 │       ├── 006_rls_policies.sql
 │       ├── 007_storage_and_views.sql
-│       └── 008_helper_functions.sql  ← NOVO
+│       ├── 008_helper_functions.sql
+│       └── 009_admin_impersonation_and_views.sql  ← NOVO
 │
 ├── frontend/                        ← TELAS (HTML/CSS/JS)
 │   ├── index.html                   ← Página inicial (redireciona)
@@ -30,6 +31,8 @@ meu-trello/
 │       ├── kanban.html              ← Quadro Kanban
 │       ├── card.html                ← Detalhes do cartão
 │       ├── reports.html             ← Relatórios executivos
+│       ├── calendar.html            ← Visualização de calendário
+│       ├── timeline.html            ← Visualização de timeline
 │       ├── members.html             ← Membros do workspace
 │       ├── settings.html            ← Configurações
 │       ├── profile.html             ← Perfil do usuário
@@ -94,6 +97,8 @@ login.html
               │         └──► card.html (detalhes completos do cartão)
               │
               ├──► reports.html (relatórios + exportar CSV)
+              ├──► calendar.html (calendário por data de entrega)
+              ├──► timeline.html (timeline por início/entrega)
               ├──► members.html (gerenciar membros)
               ├──► settings.html (configurações do workspace)
               └──► profile.html (perfil do usuário)
@@ -152,6 +157,16 @@ login.html
 - [x] Gráfico de barras por board
 - [x] Tabela detalhada com todos os cartões
 - [x] Exportar para CSV (abre no Excel)
+
+### calendar.html
+- [x] Visualização mensal de cartões por data de entrega
+- [x] Navegação entre meses
+- [x] Destaque de itens atrasados
+
+### timeline.html
+- [x] Linha do tempo por data de início/entrega
+- [x] Barras relativas à duração das tarefas
+- [x] Destaque visual para tarefas atrasadas
 
 ### members.html
 - [x] Lista de membros com foto e função

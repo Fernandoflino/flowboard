@@ -144,6 +144,7 @@ const WS_ID    = params.get('ws');
 
 let board = null, lists = [], cards = [], members = [], labels = [];
 let dragCard = null, dragSourceListId = null;
+const IS_TOUCH_DEVICE = window.matchMedia?.("(pointer: coarse)")?.matches || ("ontouchstart" in window);
 let activeFilters = { member: null, label: null, status: null };
 
 async function init() {
@@ -306,7 +307,7 @@ function renderCard(c) {
   ).join('') || '';
 
   return `
-    <div class="card-item" draggable="true" data-card-id="${c.id}"
+    <div class="card-item" draggable="${IS_TOUCH_DEVICE ? 'false' : 'true'}" data-card-id="${c.id}"
          ondragstart="onDragStart(event,'${c.id}','${c.list_id}')"
          ondragend="onDragEnd(event)"
          onclick="openCard('${c.id}')">
@@ -320,6 +321,7 @@ function renderCard(c) {
             📅 ${fmtDate(c.due_date)}
           </span>` : ''}
         ${assignees ? `<div class="card-assignees">${assignees}</div>` : ''}
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="event.stopPropagation();openCard('${c.id}')">✏️ Editar</button>
       </div>
     </div>`;
 }

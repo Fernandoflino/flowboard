@@ -176,6 +176,12 @@
       <a href="/pages/reports.html?ws=${currentWorkspaceId}" class="sidebar-item">
         <span class="icon">📊</span> Relatórios
       </a>
+      <a href="/pages/calendar.html?ws=${currentWorkspaceId}" class="sidebar-item">
+        <span class="icon">🗓️</span> Calendário
+      </a>
+      <a href="/pages/timeline.html?ws=${currentWorkspaceId}" class="sidebar-item">
+        <span class="icon">📈</span> Timeline
+      </a>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Workspace</div>
         <a href="/pages/members.html?ws=${currentWorkspaceId}" class="sidebar-item">
@@ -258,7 +264,7 @@
     const bg = b.background?.value || 'linear-gradient(135deg,#2a4299,#4f7cff)';
     const vis = { workspace: '🌐', private: '🔒', public: '🌍' }[b.visibility] || '';
     return `
-      <a class="board-card" href="/pages/kanban.html?board=${b.id}&ws=${currentWorkspaceId}">
+      <a class="board-card" href="/pages/kanban.html?board=${b.id}&ws=${currentWorkspaceId}" onclick="openBoard(event, '${b.id}')" title="Abrir board">
         <div class="board-cover" style="background:${bg}"></div>
         <div class="board-info">
           <div class="board-name">${b.name}</div>
@@ -267,6 +273,16 @@
           </div>
         </div>
       </a>`;
+  }
+
+  function openBoard(eventOrBoardId, maybeBoardId) {
+    const boardId = maybeBoardId || eventOrBoardId;
+    const evt = (eventOrBoardId && typeof eventOrBoardId === 'object') ? eventOrBoardId : null;
+
+    if (evt?.preventDefault) evt.preventDefault();
+    if (evt?.stopPropagation) evt.stopPropagation();
+
+    window.location.href = `/pages/kanban.html?board=${boardId}&ws=${currentWorkspaceId}`;
   }
 
   function renderNoWorkspace() {
