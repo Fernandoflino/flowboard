@@ -289,6 +289,16 @@
     window.location.href = `/pages/kanban.html?board=${boardId}&ws=${currentWorkspaceId}`;
   }
 
+  function openBoard(eventOrBoardId, maybeBoardId) {
+    const boardId = maybeBoardId || eventOrBoardId;
+    const evt = (eventOrBoardId && typeof eventOrBoardId === 'object') ? eventOrBoardId : null;
+
+    if (evt?.preventDefault) evt.preventDefault();
+    if (evt?.stopPropagation) evt.stopPropagation();
+
+    window.location.href = `/pages/kanban.html?board=${boardId}&ws=${currentWorkspaceId}`;
+  }
+
   function renderNoWorkspace() {
     document.getElementById('main').innerHTML = `
       <div class="empty-state">
